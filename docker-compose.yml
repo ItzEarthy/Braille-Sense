@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    image: braille-sense-backend:latest
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  frontend:
+    build: ./frontend
+    image: braille-sense-frontend:latest
+    ports:
+      - "5657:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
