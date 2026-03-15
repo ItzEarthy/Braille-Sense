@@ -6,6 +6,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'Hello from Backend' });
 });
 
-app.listen(port, () => {
+// bind explicitly to 0.0.0.0 so the service is reachable from other hosts/containers
+app.listen(port, '0.0.0.0', () => {
   console.log(`Backend listening on port ${port}`);
 });

@@ -7,6 +7,18 @@
   </head>
   <body>
     <h1>Hello World from Frontend</h1>
-    <p>The backend is available at <a href="http://localhost:5000">http://localhost:5000</a></p>
+    <p>Backend API: <a id="backend-link" href="/api">/api</a></p>
+    <div id="backend-response">Checking backend...</div>
+    <script>
+      // Request the backend via host-relative /api so this works on any host.
+      fetch('/api')
+        .then(r => r.json())
+        .then(j => {
+          document.getElementById('backend-response').textContent = JSON.stringify(j);
+        })
+        .catch(err => {
+          document.getElementById('backend-response').textContent = 'Backend unreachable: ' + err.message;
+        });
+    </script>
   </body>
 </html>
