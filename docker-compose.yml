@@ -2,13 +2,11 @@ version: '3.8'
 services:
   backend:
     build: ./backend
-    image: braille-sense-backend:latest
     ports:
       - "11112:5000"
     restart: unless-stopped
   frontend:
     build: ./frontend
-    image: braille-sense-frontend:latest
     ports:
       - "11111:80"
     depends_on:
