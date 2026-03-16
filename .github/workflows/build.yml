@@ -23,12 +23,12 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/ItzEarthy/braille-backend:latest
+          tags: ghcr.io/itzearhty/braille-backend:latest
 
       - name: Build and push Frontend
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
           push: true
-          tags: ghcr.io/ItzEarthy/braille-frontend:latest
+          tags: ghcr.io/itzearhty/braille-frontend:latest
 
