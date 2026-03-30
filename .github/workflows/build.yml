@@ -12,7 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Login to GHCR
+      - name: Login to GHCR (use GHCR_PAT if available)
+        if: ${{ secrets.GHCR_PAT != '' }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Login to GHCR (fallback to GITHUB_TOKEN)
+        if: ${{ secrets.GHCR_PAT == '' }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
