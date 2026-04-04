@@ -17,7 +17,7 @@
     </header>
 
     <!--Everything else under company name-->
-    <div class="main-view">
+    <div id="main-view">
 
       <!--What it shows if camera is not allowed-->
       <div id="camera-placeholder">
@@ -26,12 +26,18 @@
       </div>
     
       <!--Camera feed of when accepted by user-->
-      <video id="camera-feed" autoplay playsinline></video>
+      <video id="camera-feed" autoplay playsinline muted></video>
+
+      <div id="camera-overlay">
+        <p>Tap to capture</p>
+      </div>
+
+      <div id="flash-overlay"></div>
 
     </div>
 
   </div>
 
-  <script src="js/script.js"></script>
 </body>
+<script src="js/script.js"></script>
 </html>
