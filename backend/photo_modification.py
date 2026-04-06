@@ -5,8 +5,8 @@ from pathlib import Path
 BLUR_KERNEL = 15      # Must be an odd number (e.g., 9, 11, 15). Blurs out paper texture.
 
 # Adaptive Thresholding
-BLOCK_SIZE = 51       # Must be an odd number (e.g., 31, 51, 99). Should be larger than a Braille dot.
-C_VALUE = 10          # Subtracted from the mean. Higher = less noise, but might erase dots. Try 2 to 15.
+BLOCK_SIZE = 99       # Must be an odd number (e.g., 31, 51, 99). Should be larger than a Braille dot.
+C_VALUE = 15          # Subtracted from the mean. Higher = less noise, but might erase dots. Try 2 to 15.
 INVERT_COLORS = False # False = Black dots on white paper. True = White dots on black paper.
 
 # Resolve input path
