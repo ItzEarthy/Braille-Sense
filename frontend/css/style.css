@@ -114,6 +114,58 @@
     z-index: 50;
     transition: opacity 0.1s ease-in-out;
   }
+
+  #settings-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+  
+    height: 90%;
+    width: 85%;
+    max-width: 320px;
+  
+    background: rgba(74,144,242, 0.85);
+    color: white;
+  
+    padding: 16px;
+    border-radius: 16px;
+  
+    z-index: 100;
+  
+    display: none; /* hidden by default */
+  
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  
+  #settings-panel h2 {
+    margin-bottom: 10px;
+    font-size: 18px;
+  }
+
+  #settings-panel label {
+    display: block;
+    font-size: 14px;
+  }
+  
+  #settings-panel input[type="range"] {
+    width: 100%;
+    margin-top: 6px;
+  }
+  
+  #settings-panel input[type="checkbox"] {
+    margin-left: 10px;
+  }
+
+  #settings-panel button {
+    margin-top: 10px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #4a90e2;
+    color: white;
+    width: 100%;
+  }
   
   @media (max-width: 500px) {
     body {

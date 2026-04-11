@@ -32,7 +32,38 @@
         <p>Tap to capture</p>
       </div>
 
+      <!--Flash animation-->
       <div id="flash-overlay"></div>
+
+      <div id="settings-panel">
+        <h2>Settings</h2>
+      
+        <!-- Sound Volume -->
+        <label>
+          Sound Volume
+          <input type="range" id="sound-volume" min="0" max="1" step="0.1" value="1">
+        </label>
+      
+        <br /><br />
+      
+        <!-- Flashlight Toggle -->
+        <label>
+          Flashlight
+          <input type="checkbox" id="flashlight-toggle">
+        </label>
+      
+        <br /><br />
+      
+        <!-- TTS Volume -->
+        <label>
+          Speech Volume
+          <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1">
+        </label>
+      
+        <br /><br />
+      
+        <button id="close-settings">Close</button>
+      </div>
 
     </div>
 
