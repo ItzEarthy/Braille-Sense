@@ -52,6 +52,20 @@
   
     overflow: hidden;
   }
+
+  #setting-button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  
+    z-index: 20; /* make sure it's above camera */
+    cursor: pointer;
+  }
+  
+  #setting-button img {
+    width: 32px; /* adjust size as needed */
+    height: 32px;
+  }
   
   #camera-placeholder {
     text-align: center;
@@ -68,6 +82,10 @@
     background: #4a90e2;
     color: white;
     font-size: 16px;
+  }
+
+  #camera-placeholder h3{
+    padding-top: 10px;
   }
   
   #camera-feed {
@@ -147,6 +165,7 @@
   #settings-panel label {
     display: block;
     font-size: 18px;
+    height: 33%;
   }
   
   #settings-panel input[type="range"] {

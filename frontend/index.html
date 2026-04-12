@@ -18,11 +18,15 @@
 
     <!--Everything else under company name-->
     <div id="main-view">
+      <div id="setting-button">
+        <img src="setting.png" alt="Settings Button">
+      </div>
 
       <!--What it shows if camera is not allowed-->
       <div id="camera-placeholder">
         <p>Please give camera permissions to display lens</p>
         <button id="enable-camera">Enable Camera</button>
+        <h3>Double Tap For Settings</h3>
       </div>
     
       <!--Camera feed of when accepted by user-->
@@ -41,7 +45,7 @@
         <!-- Sound Volume -->
         <label>
           Text Size
-          <input type="range" id="sound-volume" min="0" max="1" step="0.1" value="1">
+          <input type="range" id="text-size" min="0" max="1" step="0.1" value="1">
         </label>
       
         <br /><br />

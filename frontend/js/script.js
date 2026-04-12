@@ -9,6 +9,14 @@ const settingsPanel = document.getElementById('settings-panel');
 const closeSettings = document.getElementById('close-settings');
 const ttsSlider = document.getElementById('tts-volume');
 const ttsToggle = document.getElementById('tts-toggle');
+const settings = document.getElementById("setting-button");
+
+//TODO
+/*
+Figure out if want to tap side of settings to turn up and down
+
+Setup place to say "double tap for settings"
+*/
 
 //Variables
 let lastTap = 0;
@@ -34,6 +42,10 @@ button.addEventListener('click', async () => {
       console.error(err);
       alert('Camera access denied or not available.');
     }
+  });
+
+  settings.addEventListener('click', () =>{
+    toggleSettings();
   });
 
 //flash for when user takes photo
