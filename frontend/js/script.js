@@ -51,19 +51,19 @@ video.addEventListener('click', () => {
     }, 100);
 });
 
-// Detect double tap (mobile) + double click (desktop)
+// Detect double tap (mobile) + double click (desktop) for settings
 mainView.addEventListener('click', () => {
   const now = Date.now();
   const timeBetween = now - lastTap;
 
   if (timeBetween < 300 && timeBetween > 0) {
-    // Double tap detected
     toggleSettings();
   }
 
   lastTap = now;
 });
 
+// When called, shows settings page
 function toggleSettings() {
   if (settingsPanel.style.display === 'none' || settingsPanel.style.display === '') {
     settingsPanel.style.display = 'block';
@@ -72,11 +72,13 @@ function toggleSettings() {
   }
 }
 
+// Shows volume in console log
 ttsSlider.addEventListener('input', () => {
   ttsVolume = parseFloat(ttsSlider.value);
   console.log('TTS volume:', ttsVolume);
 });
 
+// Function of actually speaking
 function speak(text) {
     if (!ttsEnabled) return;
   
@@ -107,6 +109,7 @@ function speak(text) {
     speechSynthesis.speak(utterance);
 }
 
+// Toggle whether or not TTS should be used
 ttsToggle.addEventListener('change', () => {
     ttsEnabled = ttsToggle.checked;
   
@@ -120,4 +123,7 @@ ttsToggle.addEventListener('change', () => {
     settingsPanel.style.display = isOpen ? 'none' : 'block';
   }
 
-
+// Close button
+closeSettings.addEventListener('click', () => {
+    settingsPanel.style.display = 'none';
+});
