@@ -7,33 +7,34 @@ const mainView = document.getElementById('main-view');
 const flash = document.getElementById('flash-overlay');
 const settingsPanel = document.getElementById('settings-panel');
 const closeSettings = document.getElementById('close-settings');
-const soundSlider = document.getElementById('sound-volume');
-const flashlightToggle = document.getElementById('flashlight-toggle');
 const ttsSlider = document.getElementById('tts-volume');
+const ttsToggle = document.getElementById('tts-toggle');
 
 //Variables
 let lastTap = 0;
-let soundVolume = 1;
+let videoTrack = null;
+let soundLevel = 1;
 let ttsVolume = 1;
+let ttsEnabled = false;
 
 button.addEventListener('click', async () => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-
-    // Show camera, hide default
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
-
+      });
+  
+      video.srcObject = stream;
+      videoTrack = stream.getVideoTracks()[0];
+  
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      overlay.style.display = 'block';
+  
     } catch (err) {
-        console.error(err);
-        alert('Camera access denied or not available.');
+      console.error(err);
+      alert('Camera access denied or not available.');
     }
-});
+  });
 
 //flash for when user takes photo
 video.addEventListener('click', () => {
@@ -71,65 +72,52 @@ function toggleSettings() {
   }
 }
 
-soundSlider.addEventListener('input', () => {
-  soundVolume = parseFloat(soundSlider.value);
-  console.log('Sound volume:', soundVolume);
-});
-
 ttsSlider.addEventListener('input', () => {
   ttsVolume = parseFloat(ttsSlider.value);
   console.log('TTS volume:', ttsVolume);
 });
 
 function speak(text) {
+    if (!ttsEnabled) return;
+  
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.volume = ttsVolume;
+  
+    const length = text.length;
+  
+    let soundLevel;
+  
+    if (length < 20) {
+      soundLevel = 1.2;
+      utterance.rate = 1.15;
+      utterance.pitch = 1.2;
+    } 
+    else if (length < 80) {
+      soundLevel = 1.0;
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+    } 
+    else {
+      soundLevel = 0.8;
+      utterance.rate = 0.85;
+      utterance.pitch = 0.9;
+    }
+  
+    utterance.volume = Math.max(0, Math.min(1, soundLevel * ttsVolume));
+  
     speechSynthesis.speak(utterance);
-  }
+}
 
-  let videoTrack = null;
-
-button.addEventListener('click', async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-
-    videoTrack = stream.getVideoTracks()[0];
-
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
-
-  } catch (err) {
-    console.error(err);
-    alert('Camera access denied or not available.');
-  }
-});
-
-flashlightToggle.addEventListener('change', async () => {
-    if (!videoTrack) return;
+ttsToggle.addEventListener('change', () => {
+    ttsEnabled = ttsToggle.checked;
   
-    const capabilities = videoTrack.getCapabilities();
+    ttsSlider.disabled = !ttsEnabled;
   
-    if (!capabilities.torch) {
-      alert('Flashlight not supported on this device');
-      return;
-    }
-  
-    try {
-      await videoTrack.applyConstraints({
-        advanced: [{ torch: flashlightToggle.checked }]
-      });
-    } catch (err) {
-      console.error('Torch error:', err);
-    }
+    ttsSlider.style.opacity = ttsEnabled ? "1" : "0.4";
   });
 
+  function toggleSettings() {
+    const isOpen = settingsPanel.style.display === 'block';
+    settingsPanel.style.display = isOpen ? 'none' : 'block';
+  }
 
-// Close button
-closeSettings.addEventListener('click', () => {
-    settingsPanel.style.display = 'none';
-});
+
