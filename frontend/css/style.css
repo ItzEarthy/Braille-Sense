@@ -141,11 +141,12 @@
   #settings-panel h2 {
     margin-bottom: 10px;
     font-size: 18px;
+    text-align: center;
   }
 
   #settings-panel label {
     display: block;
-    font-size: 14px;
+    font-size: 18px;
   }
   
   #settings-panel input[type="range"] {
@@ -157,13 +158,13 @@
     margin-left: 10px;
   }
 
-  #settings-panel button {
+  #close-settings {
     margin-top: 10px;
     padding: 10px;
     border: none;
     border-radius: 8px;
-    background: #4a90e2;
-    color: white;
+    background: white;
+    color: #4a90e2;
     width: 100%;
   }
   
