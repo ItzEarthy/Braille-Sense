@@ -6,6 +6,9 @@ const mainView = document.getElementById('main-view');
 const flash = document.getElementById('flash-overlay');
 
 let socket = null;
+let isFrozen = false;
+const canvas = document.getElementById('freeze-frame');
+const ctx = canvas.getContext('2d');
 
 button.addEventListener('click', async () => {
     try {
@@ -26,29 +29,62 @@ button.addEventListener('click', async () => {
     }
 });
 
-//flash for when user takes photo
+//flash for when user takes photo and freeze frame
 video.addEventListener('click', () => {
-    flash.style.transition = 'none';
+  // If frozen → unfreeze
+  if (isFrozen) {
+    canvas.style.display = 'none';
+    video.style.display = 'block';
+    isFrozen = false;
+    console.log('Camera resumed');
+    return;
+  }
+
+  // Capture frame
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Show frozen frame
+  canvas.style.display = 'block';
+  video.style.display = 'none';
+
+  // Flash effect
+  flash.style.transition = 'none';
+  flash.style.opacity = 0;
+  flash.offsetHeight;
+
+  flash.style.transition = 'opacity 0.1s ease-in-out';
+  flash.style.opacity = 0.8;
+
+  setTimeout(() => {
     flash.style.opacity = 0;
-    
-    flash.offsetHeight; 
+  }, 100);
 
-    flash.style.transition = 'opacity 0.1s ease-in-out';
-    flash.style.opacity = 0.8;
+  // Send image (optional: real image instead of placeholder)
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    const base64Image = canvas.toDataURL('image/png');
 
-    setTimeout(() => {
-      flash.style.opacity = 0;
-    }, 100);
-
-    if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type: 'test_image',
-      image: 'placeholder-for-now'
+      image: base64Image
     }));
-    console.log('Test message sent to backend');
-    } else {
+
+    console.log('Image sent to backend');
+  } else {
     console.log('WebSocket not connected');
-    }
+  }
+
+  isFrozen = true;
+});
+
+canvas.addEventListener('click', () => {
+  if (isFrozen) {
+    canvas.style.display = 'none';
+    video.style.display = 'block';
+    isFrozen = false;
+    console.log('Camera resumed');
+  }
 });
 
 function connectWebSocket(retries = 5) {
