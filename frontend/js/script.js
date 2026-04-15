@@ -7,24 +7,25 @@ const mainView = document.getElementById('main-view');
 const flash = document.getElementById('flash-overlay');
 const settingsPanel = document.getElementById('settings-panel');
 const closeSettings = document.getElementById('close-settings');
-const ttsSlider = document.getElementById('tts-volume');
 const ttsToggle = document.getElementById('tts-toggle');
 const settings = document.getElementById("setting-button");
+const textSizeArea = document.getElementById('text-size-area');
+const ttsVolumeArea = document.getElementById('tts-volume-area');
+const ttsToggleRow = document.getElementById('tts-toggle-row');
 
 //TODO
 /*
 Figure out if want to tap side of settings to turn up and down
-
-Setup place to say "double tap for settings"
 */
 
 //Variables
 let lastTap = 0;
 let videoTrack = null;
-let soundLevel = 1;
 let ttsVolume = 1;
 let ttsEnabled = false;
+let textSize = 1;
 
+//starts live video feed from phone
 button.addEventListener('click', async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -75,21 +76,6 @@ mainView.addEventListener('click', () => {
   lastTap = now;
 });
 
-// When called, shows settings page
-function toggleSettings() {
-  if (settingsPanel.style.display === 'none' || settingsPanel.style.display === '') {
-    settingsPanel.style.display = 'block';
-  } else {
-    settingsPanel.style.display = 'none';
-  }
-}
-
-// Shows volume in console log
-ttsSlider.addEventListener('input', () => {
-  ttsVolume = parseFloat(ttsSlider.value);
-  console.log('TTS volume:', ttsVolume);
-});
-
 // Function of actually speaking
 function speak(text) {
     if (!ttsEnabled) return;
@@ -121,19 +107,49 @@ function speak(text) {
     speechSynthesis.speak(utterance);
 }
 
-// Toggle whether or not TTS should be used
-ttsToggle.addEventListener('change', () => {
-    ttsEnabled = ttsToggle.checked;
-  
-    ttsSlider.disabled = !ttsEnabled;
-  
-    ttsSlider.style.opacity = ttsEnabled ? "1" : "0.4";
-  });
-
-  function toggleSettings() {
+//shows and closes settings
+function toggleSettings() {
     const isOpen = settingsPanel.style.display === 'block';
     settingsPanel.style.display = isOpen ? 'none' : 'block';
+}
+
+/*
+* next two functions take where the user taps
+* then adds or subtracts from the area they selected in the settings
+*/
+textSizeArea.addEventListener('click', (e) => {
+  const rect = textSizeArea.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  if (x < rect.width / 2) {
+    textSize = Math.max(0.5, +(textSize - 0.1).toFixed(2));
+  } else {
+    textSize = Math.min(2, +(textSize + 0.1).toFixed(2));
   }
+
+  placeholder.style.fontSize = textSize + "rem";
+});
+
+ttsVolumeArea.addEventListener('click', (e) => {
+    if (!ttsEnabled) return;
+  
+    const rect = ttsVolumeArea.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+  
+    if (x < rect.width / 2) {
+      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+    } else {
+      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+    }
+});
+
+// checks to see if text to speech is enabled
+ttsToggleRow.addEventListener('click', () => {
+    ttsEnabled = !ttsEnabled;
+    ttsToggle.checked = ttsEnabled;
+  
+    ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+});
 
 // Close button
 closeSettings.addEventListener('click', () => {

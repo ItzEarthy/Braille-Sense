@@ -42,29 +42,29 @@
       <div id="settings-panel">
         <h2>Settings</h2>
       
-        <!-- Sound Volume -->
-        <label>
-          Text Size
-          <input type="range" id="text-size" min="0" max="1" step="0.1" value="1">
-        </label>
+        <!-- TEXT SIZE (tap left/right) -->
+        <div class="setting-row">
+          <div class="setting-title">Text Size</div>
+          <div id="text-size-area" class="tap-area"></div>
+        </div>
       
-        <br /><br />
+        <br />
       
-        <!-- Voice Output Toggle -->
-        <label>
-          Voice Output
+        <!-- VOICE TOGGLE (tap whole row) -->
+        <div class="setting-row clickable" id="tts-toggle-row">
+          <div class="setting-title">Voice Output</div>
           <input type="checkbox" id="tts-toggle">
-        </label>
+        </div>
       
-        <br /><br />
+        <br />
       
-        <!-- Voice Volume -->
-        <label>
-          Voice Volume
-          <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1" disabled>
-        </label>
+        <!-- VOICE VOLUME (tap left/right, only if enabled) -->
+        <div class="setting-row">
+          <div class="setting-title">Voice Volume</div>
+          <div id="tts-volume-area" class="tap-area disabled"></div>
+        </div>
       
-        <br /><br />
+        <br />
       
         <button id="close-settings">Close</button>
       </div>

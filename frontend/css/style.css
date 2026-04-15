@@ -165,16 +165,70 @@
   #settings-panel label {
     display: block;
     font-size: 18px;
-    height: 33%;
-  }
-  
-  #settings-panel input[type="range"] {
-    width: 100%;
-    margin-top: 6px;
+    margin-bottom: 12px;
   }
   
   #settings-panel input[type="checkbox"] {
     margin-left: 10px;
+  }
+
+  .setting-row {
+    height: 25%;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+  }
+  
+  .setting-title {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  
+  /* clickable split area */
+  .tap-area {
+    width: 100%;
+    height: 75%;
+    display: flex;
+  }
+
+  .tap-area::before {
+    border-right: 2px solid white;
+  }
+  
+  #text-size-area::before,
+  #tts-volume-area::before {
+    content: "−";
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    opacity: 0.8;
+  }
+  
+  #text-size-area::after,
+  #tts-volume-area::after {
+    content: "+";
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    opacity: 0.8;
+  }
+  
+  /* disabled state */
+  .tap-area.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  
+  /* whole-row toggle */
+  .setting-row.clickable {
+    cursor: pointer;
   }
 
   #close-settings {
@@ -187,7 +241,7 @@
     width: 100%;
   }
   
-  @media (max-width: 500px) {
+  @media (max-width: 750px) {
     body {
       background: white;
       display: block;
@@ -196,7 +250,7 @@
   
     .app {
       width: 100%;
-      max-width: 390px;
+      max-width: 650px;
         
       height: 100dvh;
       max-height: 844px; 
