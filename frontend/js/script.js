@@ -1,28 +1,53 @@
+//HTHML Elements
 const button = document.getElementById('enable-camera');
 const video = document.getElementById('camera-feed');
 const placeholder = document.getElementById('camera-placeholder');
 const overlay = document.getElementById('camera-overlay');
 const mainView = document.getElementById('main-view');
 const flash = document.getElementById('flash-overlay');
+const settingsPanel = document.getElementById('settings-panel');
+const closeSettings = document.getElementById('close-settings');
+const ttsToggle = document.getElementById('tts-toggle');
+const settings = document.getElementById("setting-button");
+const textSizeArea = document.getElementById('text-size-area');
+const ttsVolumeArea = document.getElementById('tts-volume-area');
+const ttsToggleRow = document.getElementById('tts-toggle-row');
 
+//TODO
+/*
+Figure out if want to tap side of settings to turn up and down
+*/
+
+//Variables
+let lastTap = 0;
+let videoTrack = null;
+let ttsVolume = 1;
+let ttsEnabled = false;
+let textSize = 1;
+
+//starts live video feed from phone
 button.addEventListener('click', async () => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" }
-    });
-
-    video.srcObject = stream;
-
-    // Show camera, hide default
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
-
+      });
+  
+      video.srcObject = stream;
+      videoTrack = stream.getVideoTracks()[0];
+  
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      overlay.style.display = 'block';
+  
     } catch (err) {
-        console.error(err);
-        alert('Camera access denied or not available.');
+      console.error(err);
+      alert('Camera access denied or not available.');
     }
-});
+  });
+
+  settings.addEventListener('click', () =>{
+    toggleSettings();
+  });
 
 //flash for when user takes photo
 video.addEventListener('click', () => {
@@ -37,4 +62,96 @@ video.addEventListener('click', () => {
     setTimeout(() => {
       flash.style.opacity = 0;
     }, 100);
+});
+
+// Detect double tap (mobile) + double click (desktop) for settings
+mainView.addEventListener('click', () => {
+  const now = Date.now();
+  const timeBetween = now - lastTap;
+
+  if (timeBetween < 300 && timeBetween > 0) {
+    toggleSettings();
+  }
+
+  lastTap = now;
+});
+
+// Function of actually speaking
+function speak(text) {
+    if (!ttsEnabled) return;
+  
+    const utterance = new SpeechSynthesisUtterance(text);
+  
+    const length = text.length;
+  
+    let soundLevel;
+  
+    if (length < 20) {
+      soundLevel = 1.2;
+      utterance.rate = 1.15;
+      utterance.pitch = 1.2;
+    } 
+    else if (length < 80) {
+      soundLevel = 1.0;
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+    } 
+    else {
+      soundLevel = 0.8;
+      utterance.rate = 0.85;
+      utterance.pitch = 0.9;
+    }
+  
+    utterance.volume = Math.max(0, Math.min(1, soundLevel * ttsVolume));
+  
+    speechSynthesis.speak(utterance);
+}
+
+//shows and closes settings
+function toggleSettings() {
+    const isOpen = settingsPanel.style.display === 'block';
+    settingsPanel.style.display = isOpen ? 'none' : 'block';
+}
+
+/*
+* next two functions take where the user taps
+* then adds or subtracts from the area they selected in the settings
+*/
+textSizeArea.addEventListener('click', (e) => {
+  const rect = textSizeArea.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  if (x < rect.width / 2) {
+    textSize = Math.max(0.5, +(textSize - 0.1).toFixed(2));
+  } else {
+    textSize = Math.min(2, +(textSize + 0.1).toFixed(2));
+  }
+
+  placeholder.style.fontSize = textSize + "rem";
+});
+
+ttsVolumeArea.addEventListener('click', (e) => {
+    if (!ttsEnabled) return;
+  
+    const rect = ttsVolumeArea.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+  
+    if (x < rect.width / 2) {
+      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+    } else {
+      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+    }
+});
+
+// checks to see if text to speech is enabled
+ttsToggleRow.addEventListener('click', () => {
+    ttsEnabled = !ttsEnabled;
+    ttsToggle.checked = ttsEnabled;
+  
+    ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+});
+
+// Close button
+closeSettings.addEventListener('click', () => {
+    settingsPanel.style.display = 'none';
 });
