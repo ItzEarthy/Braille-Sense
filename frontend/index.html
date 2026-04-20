@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Mobile App</title>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <div class="app">
+
+    <!--Company Name Header-->
+    <header class="app-header">
+      <h1>Braille Sense</h1>
+    </header>
+
+    <!--Everything else under company name-->
+    <div id="main-view">
+
+      <!--What it shows if camera is not allowed-->
+      <div id="camera-placeholder">
+        <p>Please give camera permissions to display lens</p>
+        <button id="enable-camera">Enable Camera</button>
+      </div>
+    
+      <!--Camera feed of when accepted by user-->
+      <video id="camera-feed" autoplay playsinline muted></video>
+
+      <div id="camera-overlay">
+        <p>Tap to capture</p>
+      </div>
+
+      <div id="flash-overlay"></div>
+
+    </div>
+
+  </div>
+
+</body>
+<script src="js/script.js"></script>
+</html>

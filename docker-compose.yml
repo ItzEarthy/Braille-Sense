@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "11112:5000"
+    restart: unless-stopped
+  frontend:
+    build: ./frontend
+    ports:
+      - "11111:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
