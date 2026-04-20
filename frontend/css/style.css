@@ -52,20 +52,6 @@
   
     overflow: hidden;
   }
-
-  #setting-button {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-  
-    z-index: 20; /* make sure it's above camera */
-    cursor: pointer;
-  }
-  
-  #setting-button img {
-    width: 32px; /* adjust size as needed */
-    height: 32px;
-  }
   
   #camera-placeholder {
     text-align: center;
@@ -82,10 +68,6 @@
     background: #4a90e2;
     color: white;
     font-size: 16px;
-  }
-
-  #camera-placeholder h3{
-    padding-top: 10px;
   }
   
   #camera-feed {
@@ -132,116 +114,8 @@
     z-index: 50;
     transition: opacity 0.1s ease-in-out;
   }
-
-  #settings-panel {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
   
-    height: 90%;
-    width: 85%;
-    max-width: 320px;
-  
-    background: rgba(74,144,242, 0.85);
-    color: white;
-  
-    padding: 16px;
-    border-radius: 16px;
-  
-    z-index: 100;
-  
-    display: none; /* hidden by default */
-  
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  }
-  
-  #settings-panel h2 {
-    margin-bottom: 10px;
-    font-size: 18px;
-    text-align: center;
-  }
-
-  #settings-panel label {
-    display: block;
-    font-size: 18px;
-    margin-bottom: 12px;
-  }
-  
-  #settings-panel input[type="checkbox"] {
-    margin-left: 10px;
-  }
-
-  .setting-row {
-    height: 25%;
-    padding: 14px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.15);
-    color: white;
-  }
-  
-  .setting-title {
-    font-size: 16px;
-    margin-bottom: 8px;
-  }
-  
-  /* clickable split area */
-  .tap-area {
-    width: 100%;
-    height: 75%;
-    display: flex;
-  }
-
-  .tap-area::before {
-    border-right: 2px solid white;
-  }
-  
-  #text-size-area::before,
-  #tts-volume-area::before {
-    content: "−";
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    color: white;
-    opacity: 0.8;
-  }
-  
-  #text-size-area::after,
-  #tts-volume-area::after {
-    content: "+";
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    color: white;
-    opacity: 0.8;
-  }
-  
-  /* disabled state */
-  .tap-area.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-  }
-  
-  /* whole-row toggle */
-  .setting-row.clickable {
-    cursor: pointer;
-  }
-
-  #close-settings {
-    margin-top: 10px;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    background: white;
-    color: #4a90e2;
-    width: 100%;
-  }
-  
-  @media (max-width: 750px) {
+  @media (max-width: 500px) {
     body {
       background: white;
       display: block;
@@ -250,7 +124,7 @@
   
     .app {
       width: 100%;
-      max-width: 650px;
+      max-width: 390px;
         
       height: 100dvh;
       max-height: 844px; 

@@ -18,15 +18,11 @@
 
     <!--Everything else under company name-->
     <div id="main-view">
-      <div id="setting-button">
-        <img src="setting.png" alt="Settings Button">
-      </div>
 
       <!--What it shows if camera is not allowed-->
       <div id="camera-placeholder">
         <p>Please give camera permissions to display lens</p>
         <button id="enable-camera">Enable Camera</button>
-        <h3>Double Tap For Settings</h3>
       </div>
     
       <!--Camera feed of when accepted by user-->
@@ -36,38 +32,7 @@
         <p>Tap to capture</p>
       </div>
 
-      <!--Flash animation-->
       <div id="flash-overlay"></div>
-
-      <div id="settings-panel">
-        <h2>Settings</h2>
-      
-        <!-- TEXT SIZE (tap left/right) -->
-        <div class="setting-row">
-          <div class="setting-title">Text Size</div>
-          <div id="text-size-area" class="tap-area"></div>
-        </div>
-      
-        <br />
-      
-        <!-- VOICE TOGGLE (tap whole row) -->
-        <div class="setting-row clickable" id="tts-toggle-row">
-          <div class="setting-title">Voice Output</div>
-          <input type="checkbox" id="tts-toggle">
-        </div>
-      
-        <br />
-      
-        <!-- VOICE VOLUME (tap left/right, only if enabled) -->
-        <div class="setting-row">
-          <div class="setting-title">Voice Volume</div>
-          <div id="tts-volume-area" class="tap-area disabled"></div>
-        </div>
-      
-        <br />
-      
-        <button id="close-settings">Close</button>
-      </div>
 
     </div>
 

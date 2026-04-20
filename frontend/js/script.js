@@ -1,157 +1,136 @@
-//HTHML Elements
 const button = document.getElementById('enable-camera');
 const video = document.getElementById('camera-feed');
 const placeholder = document.getElementById('camera-placeholder');
 const overlay = document.getElementById('camera-overlay');
 const mainView = document.getElementById('main-view');
 const flash = document.getElementById('flash-overlay');
-const settingsPanel = document.getElementById('settings-panel');
-const closeSettings = document.getElementById('close-settings');
-const ttsToggle = document.getElementById('tts-toggle');
-const settings = document.getElementById("setting-button");
-const textSizeArea = document.getElementById('text-size-area');
-const ttsVolumeArea = document.getElementById('tts-volume-area');
-const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-//TODO
-/*
-Figure out if want to tap side of settings to turn up and down
-*/
+let socket = null;
 
-//Variables
-let lastTap = 0;
-let videoTrack = null;
-let ttsVolume = 1;
-let ttsEnabled = false;
-let textSize = 1;
-
-//starts live video feed from phone
-button.addEventListener('click', async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
-  
-      video.srcObject = stream;
-      videoTrack = stream.getVideoTracks()[0];
-  
-      video.style.display = 'block';
-      placeholder.style.display = 'none';
-      overlay.style.display = 'block';
-  
-    } catch (err) {
-      console.error(err);
-      alert('Camera access denied or not available.');
-    }
-  });
-
-  settings.addEventListener('click', () =>{
-    toggleSettings();
-  });
-
-//flash for when user takes photo
-video.addEventListener('click', () => {
-    flash.style.transition = 'none';
-    flash.style.opacity = 0;
-    
-    flash.offsetHeight; 
-
-    flash.style.transition = 'opacity 0.1s ease-in-out';
-    flash.style.opacity = 0.8;
-
-    setTimeout(() => {
-      flash.style.opacity = 0;
-    }, 100);
-});
-
-// Detect double tap (mobile) + double click (desktop) for settings
-mainView.addEventListener('click', () => {
-  const now = Date.now();
-  const timeBetween = now - lastTap;
-
-  if (timeBetween < 300 && timeBetween > 0) {
-    toggleSettings();
-  }
-
-  lastTap = now;
-});
-
-// Function of actually speaking
+// Text-to-speech helper
 function speak(text) {
-    if (!ttsEnabled) return;
-  
-    const utterance = new SpeechSynthesisUtterance(text);
-  
-    const length = text.length;
-  
-    let soundLevel;
-  
-    if (length < 20) {
-      soundLevel = 1.2;
-      utterance.rate = 1.15;
-      utterance.pitch = 1.2;
-    } 
-    else if (length < 80) {
-      soundLevel = 1.0;
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-    } 
-    else {
-      soundLevel = 0.8;
-      utterance.rate = 0.85;
-      utterance.pitch = 0.9;
+  const utterance = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+// Connect to backend WebSocket
+function connectWebSocket() {
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const wsUrl = `${protocol}://${window.location.hostname}:11112`;
+
+  socket = new WebSocket(wsUrl);
+
+  socket.onopen = () => {
+    console.log("WebSocket connected");
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log("Message from server:", data);
+
+      if (data.type === "result") {
+        placeholder.textContent = data.text;
+        speak(data.text);
+      } else if (data.type === "connection") {
+        console.log(data.message);
+      } else if (data.type === "error") {
+        console.error("Server error:", data.message);
+      }
+    } catch (err) {
+      console.error("Invalid message from server:", err);
     }
-  
-    utterance.volume = Math.max(0, Math.min(1, soundLevel * ttsVolume));
-  
-    speechSynthesis.speak(utterance);
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket disconnected");
+  };
+
+  socket.onerror = (err) => {
+    console.error("WebSocket error:", err);
+  };
 }
 
-//shows and closes settings
-function toggleSettings() {
-    const isOpen = settingsPanel.style.display === 'block';
-    settingsPanel.style.display = isOpen ? 'none' : 'block';
-}
-
-/*
-* next two functions take where the user taps
-* then adds or subtracts from the area they selected in the settings
-*/
-textSizeArea.addEventListener('click', (e) => {
-  const rect = textSizeArea.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-
-  if (x < rect.width / 2) {
-    textSize = Math.max(0.5, +(textSize - 0.1).toFixed(2));
-  } else {
-    textSize = Math.min(2, +(textSize + 0.1).toFixed(2));
+// Capture current video frame as base64 image
+function captureFrameAsBase64() {
+  if (!video.videoWidth || !video.videoHeight) {
+    console.error("Video not ready yet");
+    return null;
   }
 
-  placeholder.style.fontSize = textSize + "rem";
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
+// Enable camera
+button.addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" }
+    });
+
+    video.srcObject = stream;
+
+    // Show camera, hide default placeholder
+    video.style.display = 'block';
+    placeholder.style.display = 'none';
+    overlay.style.display = 'block';
+
+  } catch (err) {
+    console.error(err);
+    alert('Camera access denied or not available.');
+  }
 });
 
-ttsVolumeArea.addEventListener('click', (e) => {
-    if (!ttsEnabled) return;
-  
-    const rect = ttsVolumeArea.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-  
-    if (x < rect.width / 2) {
-      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
-    } else {
-      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
-    }
+// When user taps video: flash + capture + send image
+video.addEventListener('click', () => {
+  // Flash effect
+  flash.style.transition = 'none';
+  flash.style.opacity = 0;
+
+  flash.offsetHeight;
+
+  flash.style.transition = 'opacity 0.1s ease-in-out';
+  flash.style.opacity = 0.8;
+
+  setTimeout(() => {
+    flash.style.opacity = 0;
+  }, 100);
+
+  // Capture image
+  const imageData = captureFrameAsBase64();
+
+  if (!imageData) {
+    alert("Could not capture image.");
+    return;
+  }
+
+  // Check WebSocket connection
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    alert("WebSocket is not connected.");
+    return;
+  }
+
+  // Send image to backend
+  socket.send(
+    JSON.stringify({
+      type: "image",
+      image: imageData,
+      timestamp: Date.now()
+    })
+  );
+
+  console.log("Image sent to backend");
 });
 
-// checks to see if text to speech is enabled
-ttsToggleRow.addEventListener('click', () => {
-    ttsEnabled = !ttsEnabled;
-    ttsToggle.checked = ttsEnabled;
-  
-    ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
-});
-
-// Close button
-closeSettings.addEventListener('click', () => {
-    settingsPanel.style.display = 'none';
+// Connect on page load
+window.addEventListener("load", () => {
+  connectWebSocket();
 });
