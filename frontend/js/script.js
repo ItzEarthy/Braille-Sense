@@ -13,11 +13,6 @@ const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-//TODO
-/*
-Figure out if want to tap side of settings to turn up and down
-*/
-
 //Variables
 let lastTap = 0;
 let videoTrack = null;
@@ -38,15 +33,28 @@ button.addEventListener('click', async () => {
       video.style.display = 'block';
       placeholder.style.display = 'none';
       overlay.style.display = 'block';
+
+      if(ttsEnabled){
+        speak("Camera is now on");
+      }
   
     } catch (err) {
       console.error(err);
       alert('Camera access denied or not available.');
+      if(ttsEnabled){
+        speak("Camera access denied or not available");
+      }
     }
   });
 
   settings.addEventListener('click', () =>{
     toggleSettings();
+
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
+
   });
 
 //flash for when user takes photo
@@ -58,6 +66,10 @@ video.addEventListener('click', () => {
 
     flash.style.transition = 'opacity 0.1s ease-in-out';
     flash.style.opacity = 0.8;
+
+    if(ttsEnabled){
+      speak("Photo Taken");
+    }
 
     setTimeout(() => {
       flash.style.opacity = 0;
@@ -71,6 +83,12 @@ mainView.addEventListener('click', () => {
 
   if (timeBetween < 300 && timeBetween > 0) {
     toggleSettings();
+
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
+
   }
 
   lastTap = now;
@@ -128,6 +146,11 @@ textSizeArea.addEventListener('click', (e) => {
   }
 
   placeholder.style.fontSize = textSize + "rem";
+
+  if (ttsEnabled) {
+    speak(`Font size is now set to ${Math.round(textSize * 100)}%`);
+  }
+
 });
 
 ttsVolumeArea.addEventListener('click', (e) => {
@@ -141,6 +164,11 @@ ttsVolumeArea.addEventListener('click', (e) => {
     } else {
       ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
     }
+
+    if (ttsEnabled) {
+      speak(`Voice volume is now set to ${Math.round(ttsVolume * 100)}%`);
+    }
+  
 });
 
 // checks to see if text to speech is enabled
@@ -149,9 +177,20 @@ ttsToggleRow.addEventListener('click', () => {
     ttsToggle.checked = ttsEnabled;
   
     ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+
+    if (ttsEnabled) {
+      speak('Voice output is now turned on.');
+    } else {
+      ttsEnabled = !ttsEnabled;
+      speak('Voice output is now turned off.');
+      ttsEnabled = !ttsEnabled;
+    }
 });
 
 // Close button
 closeSettings.addEventListener('click', () => {
     settingsPanel.style.display = 'none';
+    if (ttsEnabled) {
+      speak('Settings Closed');
+    } 
 });
