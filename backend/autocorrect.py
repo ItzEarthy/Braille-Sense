@@ -77,7 +77,5 @@ def get_best_correction(word, probs, vocab, max_suggestions=3):
 user_input = input("\n Enter a word for autocorrection: ")
 suggestions = get_best_correction(user_input, probabilities, vocab, max_suggestions=3)
 
-print("\n Top suggestions:")
-for suggestion in suggestions:
-    print(suggestion[0])
+
 
