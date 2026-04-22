@@ -7,56 +7,59 @@ const port = process.env.PORT || 5000;
 
 // Basic API route
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello from Backend' });
+  res.json({ message: 'Backend + WebSocket server is running' });
 });
 
-// Create HTTP server from Express app
 const server = http.createServer(app);
-
-// Create WebSocket server
-const wss = new WebSocket.Server({ server, path: '/ws/' });
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected');
+  console.log('Client connected');
 
   ws.send(JSON.stringify({
     type: 'connection',
-    message: 'Connected to backend websocket'
+    message: 'WebSocket connection established'
   }));
 
   ws.on('message', (message) => {
-    console.log('Received:', message.toString());
-
     try {
       const data = JSON.parse(message.toString());
+      console.log('Received:', data.type);
 
-      if (data.type === 'test_image') {
-        // for now just mock a result
+      if (data.type === 'image') {
         ws.send(JSON.stringify({
           type: 'result',
-          isBraille: true,
-          translatedText: 'sample braille translation'
+          text: 'Image received successfully.'
+        }));
+      } else if (data.type === 'ping') {
+        ws.send(JSON.stringify({
+          type: 'pong',
+          message: 'Server is alive'
         }));
       } else {
         ws.send(JSON.stringify({
-          type: 'echo',
-          message: 'Message received'
+          type: 'error',
+          message: 'Unknown message type'
         }));
       }
     } catch (err) {
+      console.error('Error parsing message:', err);
       ws.send(JSON.stringify({
         type: 'error',
-        message: 'Invalid JSON sent to backend'
+        message: 'Invalid JSON'
       }));
     }
   });
 
   ws.on('close', () => {
-    console.log('WebSocket client disconnected');
+    console.log('Client disconnected');
+  });
+
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err);
   });
 });
 
-// bind explicitly to 0.0.0.0
 server.listen(port, '0.0.0.0', () => {
   console.log(`Backend listening on port ${port}`);
 });
