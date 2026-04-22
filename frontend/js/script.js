@@ -13,11 +13,6 @@ const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-let socket = null;
-let isFrozen = false;
-const canvas = document.getElementById('freeze-frame');
-const ctx = canvas.getContext('2d');
-
 //Variables
 let lastTap = 0;
 let videoTrack = null;
@@ -101,29 +96,11 @@ settings.addEventListener('click', () =>{
   toggleSettings();
 });
 
-//flash for when user takes photo and freeze frame
+//flash for when user takes photo
 video.addEventListener('click', () => {
-  // If frozen → unfreeze
-  if (isFrozen) {
-    canvas.style.display = 'none';
-    video.style.display = 'block';
-    isFrozen = false;
-    console.log('Camera resumed');
-    return;
-  }
-
-  // Capture frame
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-  // Show frozen frame
-  canvas.style.display = 'block';
-  video.style.display = 'none';
-
-  // Flash effect
   flash.style.transition = 'none';
   flash.style.opacity = 0;
+
   flash.offsetHeight;
 
   flash.style.transition = 'opacity 0.1s ease-in-out';
@@ -133,62 +110,26 @@ video.addEventListener('click', () => {
     flash.style.opacity = 0;
   }, 100);
 
-  // Send image (optional: real image instead of placeholder)
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    const base64Image = canvas.toDataURL('image/png');
+  const imageData = captureFrameAsBase64();
 
-    socket.send(JSON.stringify({
-      type: 'test_image',
-      image: base64Image
-    }));
-
-    console.log('Image sent to backend');
-  } else {
-    console.log('WebSocket not connected');
+  if (!imageData) {
+    alert("Could not capture image.");
+    return;
   }
 
-  isFrozen = true;
-});
-
-canvas.addEventListener('click', () => {
-  if (isFrozen) {
-    canvas.style.display = 'none';
-    video.style.display = 'block';
-    isFrozen = false;
-    console.log('Camera resumed');
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    alert("WebSocket is not connected.");
+    return;
   }
+
+  socket.send(JSON.stringify({
+    type: "image",
+    image: imageData,
+    timestamp: Date.now()
+  }));
+
+  console.log("Image sent to backend");
 });
-
-function connectWebSocket(retries = 5) {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  socket = new WebSocket(`${protocol}://${window.location.host}/ws/`);
-
-  socket.onopen = () => {
-    console.log('WebSocket connected');
-  };
-
-  socket.onmessage = (event) => {
-    console.log('Message from backend:', event.data);
-  };
-
-  socket.onerror = (err) => {
-    console.error('WebSocket error:', err);
-  };
-
-  socket.onclose = () => {
-    console.log('WebSocket closed');
-
-    if (retries > 0) {
-      setTimeout(() => connectWebSocket(retries - 1), 1000);
-    }
-  };
-}
-
-connectWebSocket();
-    setTimeout(() => {
-      flash.style.opacity = 0;
-    }, 100);
-
 
 // Detect double tap (mobile) + double click (desktop) for settings
 mainView.addEventListener('click', () => {
