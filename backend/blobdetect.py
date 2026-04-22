@@ -72,7 +72,7 @@ def detect_3d_braille(image_path):
 
     inverted = cv2.bitwise_not(closed)
 
-    # 5. Tuned Blob Detector
+    # 5. Blob Detector
     params = cv2.SimpleBlobDetector_Params()
     
     params.minThreshold = 10
