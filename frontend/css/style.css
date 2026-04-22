@@ -240,6 +240,10 @@
     color: #4a90e2;
     width: 100%;
   }
+
+  #freeze-frame{
+    display: none;
+  }
   
   @media (max-width: 750px) {
     body {
