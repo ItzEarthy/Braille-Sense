@@ -3,9 +3,40 @@ import numpy as np
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, messagebox
+import math
+
 TEST_PHOTOS_DIR = Path(__file__).resolve().parent / "Test Photos"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
 
+# --- DESKEWING HELPER FUNCTIONS ---
+def order_points(pts):
+    rect = np.zeros((4, 2), dtype="float32")
+    s = pts.sum(axis=1)
+    rect[0] = pts[np.argmin(s)]
+    rect[2] = pts[np.argmax(s)]
+    diff = np.diff(pts, axis=1)
+    rect[1] = pts[np.argmin(diff)]
+    rect[3] = pts[np.argmax(diff)]
+    return rect
+
+def deskew_image(img, corners):
+    rect = order_points(corners)
+    (tl, tr, br, bl) = rect
+    widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+    widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    maxWidth = max(int(widthA), int(widthB))
+    heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+    heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    maxHeight = max(int(heightA), int(heightB))
+    dst = np.array([
+        [0, 0],
+        [maxWidth - 1, 0],
+        [maxWidth - 1, maxHeight - 1],
+        [0, maxHeight - 1]
+    ], dtype="float32")
+    matrix = cv2.getPerspectiveTransform(rect, dst)
+    return cv2.warpPerspective(img, matrix, (maxWidth, maxHeight))
+# ----------------------------------
 
 def open_test_photo_dropdown():
     photos = sorted(
@@ -53,53 +84,130 @@ def detect_3d_braille(image_path):
     
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # 1. Edge-Preserving Blur
     blurred = cv2.bilateralFilter(gray, d=9, sigmaColor=75, sigmaSpace=75)
 
-    # 2. Relaxed Threshold 
+    # Increased blockSize to 91 so massive close-up shadows don't hollow out
     thresh = cv2.adaptiveThreshold(
         blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-        cv2.THRESH_BINARY_INV, blockSize=41, C=12
+        cv2.THRESH_BINARY_INV, blockSize=91, C=12
     )
 
-    # 3. Dilation
     fat_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     fattened = cv2.dilate(thresh, fat_kernel, iterations=1)
 
-    # 4. Morphological Closing
     close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     closed = cv2.morphologyEx(fattened, cv2.MORPH_CLOSE, close_kernel)
 
     inverted = cv2.bitwise_not(closed)
 
-    # 5. Blob Detector
     params = cv2.SimpleBlobDetector_Params()
-    
     params.minThreshold = 10
     params.maxThreshold = 255
     
+    # Increased maxArea significantly to catch close-ups
     params.filterByArea = True
-    params.minArea = 8           
-    params.maxArea = 1000
-
+    params.minArea = 5          
+    params.maxArea = 3000
+    
+    # Slightly more forgiving shapes for extreme angles
     params.filterByCircularity = True
-    params.minCircularity = 0.35 
-    
+    params.minCircularity = 0.3 
     params.filterByInertia = True
-    params.minInertiaRatio = 0.15 
-
+    params.minInertiaRatio = 0.1 
     params.filterByConvexity = True
-    params.minConvexity = 0.6    
-    
+    params.minConvexity = 0.5    
     params.filterByColor = True
     params.blobColor = 0 
 
     detector = cv2.SimpleBlobDetector_create(params)
-    keypoints = detector.detect(inverted)
+    raw_keypoints = detector.detect(inverted)
 
-    # Draw results
+    # --- DYNAMIC SCALE-INVARIANT CLUSTERING ---
+    valid_keypoints = []
+    flat_img = None
+    
+    if raw_keypoints:
+        pts = [kp.pt for kp in raw_keypoints]
+        
+        # 1. Calculate the median distance between dots to figure out the current scale
+        min_dists = []
+        for i, p1 in enumerate(pts):
+            dists = [math.hypot(p1[0]-p2[0], p1[1]-p2[1]) for j, p2 in enumerate(pts) if i != j]
+            if dists:
+                min_dists.append(min(dists))
+                
+        median_spacing = sorted(min_dists)[len(min_dists)//2] if min_dists else 10
+        
+        # 2. Search radius: 4x the dot spacing effortlessly jumps word gaps
+        search_radius = max(median_spacing * 4.0, 25.0) 
+        
+        # 3. Group the dots
+        clusters = []
+        visited = set()
+        
+        for i, p in enumerate(pts):
+            if i in visited: continue
+            
+            current_cluster = [raw_keypoints[i]]
+            visited.add(i)
+            
+            queue = [p]
+            while queue:
+                curr_p = queue.pop(0)
+                for j, other_p in enumerate(pts):
+                    if j not in visited:
+                        dist = math.hypot(curr_p[0]-other_p[0], curr_p[1]-other_p[1])
+                        if dist <= search_radius:
+                            visited.add(j)
+                            current_cluster.append(raw_keypoints[j])
+                            queue.append(other_p)
+                            
+            clusters.append(current_cluster)
+            
+        # 4. Score and filter clusters
+        best_cluster = None
+        best_score = 0
+        
+        for cluster in clusters:
+            num_dots = len(cluster)
+            
+            # FILTER: Room signs have between 4 and ~80 dots. 
+            # Anything > 80 is guaranteed to be a massive patch of carpet noise.
+            if 4 <= num_dots <= 80:
+                xs = [kp.pt[0] for kp in cluster]
+                ys = [kp.pt[1] for kp in cluster]
+                w = max(xs) - min(xs)
+                h = max(ys) - min(ys)
+                
+                area = (w + 1) * (h + 1)
+                density = num_dots / area
+                score = density * math.sqrt(num_dots)
+                
+                if score > best_score:
+                    best_score = score
+                    best_cluster = cluster
+                    
+        # 5. Deskew the winning cluster
+        if best_cluster is not None:
+            valid_keypoints = best_cluster
+            
+            cluster_pts = np.array([kp.pt for kp in best_cluster], dtype=np.float32)
+            rect = cv2.minAreaRect(cluster_pts)
+            
+            # Add padding based on the scale so the dots aren't right on the edge
+            (cx, cy), (w, h), angle = rect
+            pad = median_spacing * 1.5
+            padded_rect = ((cx, cy), (w + pad, h + pad), angle)
+            
+            corners = cv2.boxPoints(padded_rect)
+            plate_corners = np.int32(corners)
+            
+            cv2.drawContours(img, [plate_corners], -1, (255, 0, 0), 2)
+            flat_img = deskew_image(img, plate_corners)
+
+    # Draw ONLY the valid, filtered results
     img_with_keypoints = cv2.drawKeypoints(
-        img, keypoints, np.array([]), (0, 0, 255), 
+        img, valid_keypoints, np.array([]), (0, 0, 255), 
         cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
     )
 
@@ -114,6 +222,7 @@ def detect_3d_braille(image_path):
         screen_w, screen_h = 1920, 1080
 
     def show_scaled(title, img_to_show):
+        if img_to_show is None: return
         h, w = img_to_show.shape[:2]
         max_w = int(screen_w * 0.9)
         max_h = int(screen_h * 0.8)
@@ -128,8 +237,11 @@ def detect_3d_braille(image_path):
         cv2.resizeWindow(title, disp_w, disp_h)
         cv2.imshow(title, disp)
 
-    show_scaled("Preprocessed (What Detector Sees)", inverted)
+    show_scaled("Preprocessed", inverted)
     show_scaled("Detected 3D Braille", img_with_keypoints)
+    if flat_img is not None:
+        show_scaled("Deskewed Plate (Ready for Decoding)", flat_img)
+        
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
