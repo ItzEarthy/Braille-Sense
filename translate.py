@@ -37,7 +37,16 @@ letters = {
     "010111" : "w",
     "101101" : "x",
     "101111" : "y",
-    "101011" : "z"
+    "101011" : "z",
+    "010000" : ",",
+    "001000" : "'",
+    "001001" : "-",
+    "010011" : ".",
+    "011001" : "?",
+    "011010" : "!",
+    "001111" : "#",
+    "000011" : "letterPrefix",
+    "000001" : "capital"
 }
 
 numbers = {
@@ -53,16 +62,15 @@ numbers = {
     "j" : "0"
 }
 
-special = {
-    "010000" : ",",
-    "001000" : "'",
-    "001001" : "-",
-    "010011" : ".",
-    "011001" : "?",
-    "011010" : "!",
-    "001111" : "#",
-    "000011" : "letterPrefix",
-    "000001" : "capital"
-}
+#string word = ""
+#for b in blobs:
+#    for a in letters : 
+#       if b == a :
+#           if a == "#" :
+#               go through b until a is the letter prefix setting word into numbers(a)
+#                   
+#           word = word + letters(a)
+#create an unswapped string of letters without numbers yet
+
 
 
