@@ -2,7 +2,7 @@ import nltk
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-#from Blobs import blobs/dots
+#from blobdetect import blobs/dots
 
 #blobs = dots.split(" ")
 #alphabet
