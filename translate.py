@@ -4,7 +4,7 @@ import string
 from nltk.stem import WordNetLemmatizer
 #from Blobs import blobs/dots
 
-
+#blobs = dots.split(" ")
 #alphabet
 letters = {
     "100000" : "a",
@@ -58,14 +58,26 @@ numbers = {
 }
 
 #string word = ""
+#remaining = blobs
 #for b in blobs:
 #    for a in letters : 
 #       if b == a :
 #           if a == "#" :
-#               go through b until a is the letter prefix setting word into numbers(a)
+#               numberSwap()
 #                   
 #           word = word + letters(a)
 #create an unswapped string of letters without numbers yet
 
-
+#def string numberSwap(blobs):
+#   if blobs == null
+#       return ""
+#   string word = ""
+#   for b in blobs :
+#       for n in numbers :
+#           if b == "000011" :
+#               return word
+#           if b == n :
+#               word = word + n
+#   return word
+  
 
