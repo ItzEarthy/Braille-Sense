@@ -74,27 +74,40 @@ function captureFrameAsBase64() {
 
 //starts live video feed from phone
 button.addEventListener('click', async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "environment" }
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+  
+      video.srcObject = stream;
+      videoTrack = stream.getVideoTracks()[0];
+  
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      overlay.style.display = 'block';
 
-    video.srcObject = stream;
-    videoTrack = stream.getVideoTracks()[0];
+      if(ttsEnabled){
+        speak("Camera is now on");
+      }
+  
+    } catch (err) {
+      console.error(err);
+      alert('Camera access denied or not available.');
+      if(ttsEnabled){
+        speak("Camera access denied or not available");
+      }
+    }
+  });
 
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
+  settings.addEventListener('click', () =>{
+    toggleSettings();
 
-  } catch (err) {
-    console.error(err);
-    alert('Camera access denied or not available.');
-  }
-});
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
 
-settings.addEventListener('click', () =>{
-  toggleSettings();
-});
+  });
 
 //flash for when user takes photo
 video.addEventListener('click', () => {
@@ -112,6 +125,13 @@ video.addEventListener('click', () => {
 
   const imageData = captureFrameAsBase64();
 
+    if(ttsEnabled){
+      speak("Photo Taken");
+    }
+
+    setTimeout(() => {
+      flash.style.opacity = 0;
+    }, 100);
   if (!imageData) {
     alert("Could not capture image.");
     return;
@@ -138,6 +158,12 @@ mainView.addEventListener('click', () => {
 
   if (timeBetween < 300 && timeBetween > 0) {
     toggleSettings();
+
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
+
   }
 
   lastTap = now;
@@ -191,32 +217,53 @@ textSizeArea.addEventListener('click', (e) => {
   }
 
   placeholder.style.fontSize = textSize + "rem";
+
+  if (ttsEnabled) {
+    speak(`Font size is now set to ${Math.round(textSize * 100)}%`);
+  }
+
 });
 
 ttsVolumeArea.addEventListener('click', (e) => {
-  if (!ttsEnabled) return;
+    if (!ttsEnabled) return;
+  
+    const rect = ttsVolumeArea.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+  
+    if (x < rect.width / 2) {
+      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+    } else {
+      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+    }
 
-  const rect = ttsVolumeArea.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-
-  if (x < rect.width / 2) {
-    ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
-  } else {
-    ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
-  }
+    if (ttsEnabled) {
+      speak(`Voice volume is now set to ${Math.round(ttsVolume * 100)}%`);
+    }
+  
 });
 
 // checks to see if text to speech is enabled
 ttsToggleRow.addEventListener('click', () => {
-  ttsEnabled = !ttsEnabled;
-  ttsToggle.checked = ttsEnabled;
+    ttsEnabled = !ttsEnabled;
+    ttsToggle.checked = ttsEnabled;
+  
+    ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
 
-  ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+    if (ttsEnabled) {
+      speak('Voice output is now turned on.');
+    } else {
+      ttsEnabled = !ttsEnabled;
+      speak('Voice output is now turned off.');
+      ttsEnabled = !ttsEnabled;
+    }
 });
 
 // Close button
 closeSettings.addEventListener('click', () => {
-  settingsPanel.style.display = 'none';
+    settingsPanel.style.display = 'none';
+    if (ttsEnabled) {
+      speak('Settings Closed');
+    } 
 });
 
 // Connect WebSocket on load
