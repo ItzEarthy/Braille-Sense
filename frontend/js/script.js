@@ -24,7 +24,10 @@ let socket = null;
 // Connect to backend WebSocket
 function connectWebSocket() {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  const wsUrl = `${protocol}://${window.location.hostname}:11112`;
+  //Testing to run online
+  const wsUrl = `${protocol}://${window.location.host}/ws`;
+  //To run locally 
+  //const wsUrl = `${protocol}://${window.location.hostname}:11112`;
 
   socket = new WebSocket(wsUrl);
 
