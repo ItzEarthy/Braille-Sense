@@ -21,51 +21,20 @@ wss.on('connection', (ws) => {
 
   ws.send(JSON.stringify({
     type: 'connection',
-    message: 'Connected to backend websocket'
+    message: 'Connected to backend WebSocket'
   }));
 
   ws.on('message', (message) => {
     console.log('Received:', message.toString());
-
     try {
       const data = JSON.parse(message.toString());
+      console.log('Received type:', data.type);
 
-      if (data.type === 'test_image') {
-        // for now just mock a result
+      if (data.type === 'test_image' || data.type === 'image') {
         ws.send(JSON.stringify({
           type: 'result',
           isBraille: true,
           translatedText: 'sample braille translation'
-        }));
-      } else {
-        ws.send(JSON.stringify({
-          type: 'echo',
-          message: 'Message received'
-        }));
-      }
-    } catch (err) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: 'Invalid JSON sent to backend'
-
-
-wss.on('connection', (ws) => {
-  console.log('Client connected');
-
-  ws.send(JSON.stringify({
-    type: 'connection',
-    message: 'WebSocket connection established'
-  }));
-
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message.toString());
-      console.log('Received:', data.type);
-
-      if (data.type === 'image') {
-        ws.send(JSON.stringify({
-          type: 'result',
-          text: 'Image received successfully.'
         }));
       } else if (data.type === 'ping') {
         ws.send(JSON.stringify({
@@ -74,15 +43,15 @@ wss.on('connection', (ws) => {
         }));
       } else {
         ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Unknown message type'
+          type: 'echo',
+          message: 'Message received'
         }));
       }
     } catch (err) {
       console.error('Error parsing message:', err);
       ws.send(JSON.stringify({
         type: 'error',
-        message: 'Invalid JSON'
+        message: 'Invalid JSON sent to backend'
       }));
     }
   });
@@ -90,19 +59,13 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log('WebSocket client disconnected');
   });
-});
-
-// bind explicitly to 0.0.0.0
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Backend listening on port ${port}`);
-    console.log('Client disconnected');
-  });
 
   ws.on('error', (err) => {
     console.error('WebSocket error:', err);
   });
 });
 
+// Bind explicitly to 0.0.0.0
 server.listen(port, '0.0.0.0', () => {
   console.log(`Backend listening on port ${port}`);
 });
