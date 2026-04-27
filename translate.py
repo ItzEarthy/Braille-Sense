@@ -1,8 +1,10 @@
 import nltk
+import cv2 #import possible dependancies from blobdetect
+import numpy 
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-#from blobdetect import blobs/dots
+#from blobdetect import img_with_keypoints
 
 #blobs = dots.split(" ")
 #alphabet
