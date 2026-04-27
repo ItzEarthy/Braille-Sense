@@ -10,31 +10,26 @@ app.get('/', (req, res) => {
   res.json({ message: 'Backend + WebSocket server is running' });
 });
 
-// Create HTTP server from Express app
 const server = http.createServer(app);
-
-// Create WebSocket server
-const wss = new WebSocket.Server({ server, path: '/ws/' });
+const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected');
+  console.log('Client connected');
 
   ws.send(JSON.stringify({
     type: 'connection',
-    message: 'Connected to backend WebSocket'
+    message: 'WebSocket connection established'
   }));
 
   ws.on('message', (message) => {
-    console.log('Received:', message.toString());
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received type:', data.type);
+      console.log('Received:', data.type);
 
-      if (data.type === 'test_image' || data.type === 'image') {
+      if (data.type === 'image') {
         ws.send(JSON.stringify({
           type: 'result',
-          isBraille: true,
-          translatedText: 'sample braille translation'
+          text: 'Image received successfully.'
         }));
       } else if (data.type === 'ping') {
         ws.send(JSON.stringify({
@@ -51,13 +46,13 @@ wss.on('connection', (ws) => {
       console.error('Error parsing message:', err);
       ws.send(JSON.stringify({
         type: 'error',
-        message: 'Invalid JSON sent to backend'
+        message: 'Invalid JSON'
       }));
     }
   });
 
   ws.on('close', () => {
-    console.log('WebSocket client disconnected');
+    console.log('Client disconnected');
   });
 
   ws.on('error', (err) => {

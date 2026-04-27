@@ -13,17 +13,17 @@ const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
+let socket = null;
+let isFrozen = false;
 const canvas = document.getElementById('freeze-frame');
 const ctx = canvas.getContext('2d');
 
-// Variables
+//Variables
 let lastTap = 0;
 let videoTrack = null;
 let ttsVolume = 1;
 let ttsEnabled = false;
 let textSize = 1;
-let socket = null;
-let isFrozen = false;
 
 // Connect to backend WebSocket (single definition, with retry)
 function connectWebSocket(retries = 5) {
@@ -126,7 +126,8 @@ video.addEventListener('click', () => {
   // Flash effect
   flash.style.transition = 'none';
   flash.style.opacity = 0;
-  flash.offsetHeight; // force reflow
+  flash.offsetHeight;
+
   flash.style.transition = 'opacity 0.1s ease-in-out';
   flash.style.opacity = 0.8;
 
@@ -134,7 +135,7 @@ video.addEventListener('click', () => {
     flash.style.opacity = 0;
   }, 100);
 
-  // Send image to backend
+  // Send image (optional: real image instead of placeholder)
   if (socket && socket.readyState === WebSocket.OPEN) {
     const base64Image = captureFrameAsBase64();
 
@@ -165,7 +166,38 @@ canvas.addEventListener('click', () => {
   }
 });
 
-// Double-tap main view to toggle settings
+function connectWebSocket(retries = 5) {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  socket = new WebSocket(`${protocol}://${window.location.host}/ws/`);
+
+  socket.onopen = () => {
+    console.log('WebSocket connected');
+  };
+
+  socket.onmessage = (event) => {
+    console.log('Message from backend:', event.data);
+  };
+
+  socket.onerror = (err) => {
+    console.error('WebSocket error:', err);
+  };
+
+  socket.onclose = () => {
+    console.log('WebSocket closed');
+
+    if (retries > 0) {
+      setTimeout(() => connectWebSocket(retries - 1), 1000);
+    }
+  };
+}
+
+connectWebSocket();
+    setTimeout(() => {
+      flash.style.opacity = 0;
+    }, 100);
+
+
+// Detect double tap (mobile) + double click (desktop) for settings
 mainView.addEventListener('click', () => {
   const now = Date.now();
   const timeBetween = now - lastTap;
