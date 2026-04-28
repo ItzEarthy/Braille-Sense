@@ -4,9 +4,9 @@ import numpy
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-#from blobdetect import img_with_keypoints
+#from blobdetect import blobs
 
-#blobs = dots.split(" ")
+#blob = blobs.split(" ") / if the string of blobs are one string seperated by spaces
 #alphabet
 letters = {
     "100000" : "a",
@@ -88,9 +88,9 @@ captials = {
     "101011" : "Z"
 }
 
-#string word = ""
-#remaining = blobs
-#for b in blobs:
+word = ""
+#remaining = blob
+#for b in blob:
 #    for a in letters : 
 #       if b == a :
 #           if a == "#" :
@@ -98,7 +98,7 @@ captials = {
 #           elif a == "captial" :
 #               word = word + capitals(a)
 #           else :
-#               word = word + letters(a)
+#               word = word + letters(a)h
 #           
 #create an unswapped string of letters without numbers yet
 
