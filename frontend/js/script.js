@@ -13,11 +13,6 @@ const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-let socket = null;
-let isFrozen = false;
-const canvas = document.getElementById('freeze-frame');
-const ctx = canvas.getContext('2d');
-
 //Variables
 let lastTap = 0;
 let videoTrack = null;
@@ -87,15 +82,13 @@ button.addEventListener('click', async () => {
     video.srcObject = stream;
     videoTrack = stream.getVideoTracks()[0];
 
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
+  settings.addEventListener('click', () =>{
+    toggleSettings();
 
-  } catch (err) {
-    console.error(err);
-    alert('Camera access denied or not available.');
-  }
-});
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
 
 // Settings button
 settings.addEventListener('click', () => {
@@ -126,6 +119,7 @@ video.addEventListener('click', () => {
   // Flash effect
   flash.style.transition = 'none';
   flash.style.opacity = 0;
+
   flash.offsetHeight;
 
   flash.style.transition = 'opacity 0.1s ease-in-out';
@@ -185,17 +179,31 @@ function connectWebSocket(retries = 5) {
   socket.onclose = () => {
     console.log('WebSocket closed');
 
-    if (retries > 0) {
-      setTimeout(() => connectWebSocket(retries - 1), 1000);
+    if(ttsEnabled){
+      speak("Photo Taken");
     }
-  };
-}
 
-connectWebSocket();
     setTimeout(() => {
       flash.style.opacity = 0;
     }, 100);
+  if (!imageData) {
+    alert("Could not capture image.");
+    return;
+  }
 
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    alert("WebSocket is not connected.");
+    return;
+  }
+
+  socket.send(JSON.stringify({
+    type: "image",
+    image: imageData,
+    timestamp: Date.now()
+  }));
+
+  console.log("Image sent to backend");
+});
 
 // Detect double tap (mobile) + double click (desktop) for settings
 mainView.addEventListener('click', () => {
@@ -204,6 +212,12 @@ mainView.addEventListener('click', () => {
 
   if (timeBetween < 300 && timeBetween > 0) {
     toggleSettings();
+
+    if (ttsEnabled) {
+      const isOpen = settingsPanel.style.display === 'block';
+      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
+    }
+
   }
 
   lastTap = now;
@@ -258,16 +272,21 @@ textSizeArea.addEventListener('click', (e) => {
 
 // TTS volume controls
 ttsVolumeArea.addEventListener('click', (e) => {
-  if (!ttsEnabled) return;
+    if (!ttsEnabled) return;
+  
+    const rect = ttsVolumeArea.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+  
+    if (x < rect.width / 2) {
+      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+    } else {
+      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+    }
 
-  const rect = ttsVolumeArea.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-
-  if (x < rect.width / 2) {
-    ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
-  } else {
-    ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
-  }
+    if (ttsEnabled) {
+      speak(`Voice volume is now set to ${Math.round(ttsVolume * 100)}%`);
+    }
+  
 });
 
 // TTS toggle
@@ -279,7 +298,10 @@ ttsToggleRow.addEventListener('click', () => {
 
 // Close settings button
 closeSettings.addEventListener('click', () => {
-  settingsPanel.style.display = 'none';
+    settingsPanel.style.display = 'none';
+    if (ttsEnabled) {
+      speak('Settings Closed');
+    } 
 });
 
 // Connect WebSocket on page load

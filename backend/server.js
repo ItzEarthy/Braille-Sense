@@ -5,7 +5,6 @@ const WebSocket = require('ws');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Basic API route
 app.get('/', (req, res) => {
   res.json({ message: 'Backend + WebSocket server is running' });
 });
