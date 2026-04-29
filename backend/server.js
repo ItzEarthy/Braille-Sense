@@ -37,8 +37,8 @@ wss.on('connection', (ws) => {
         }));
       } else {
         ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Unknown message type'
+          type: 'echo',
+          message: 'Message received'
         }));
       }
     } catch (err) {
@@ -59,6 +59,7 @@ wss.on('connection', (ws) => {
   });
 });
 
+// Bind explicitly to 0.0.0.0
 server.listen(port, '0.0.0.0', () => {
   console.log(`Backend listening on port ${port}`);
 });
