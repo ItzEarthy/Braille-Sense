@@ -1,4 +1,4 @@
-// HTML Elements
+//HTHML Elements
 const button = document.getElementById('enable-camera');
 const video = document.getElementById('camera-feed');
 const placeholder = document.getElementById('camera-placeholder');
@@ -35,24 +35,24 @@ function connectWebSocket(retries = 5) {
   socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
-    console.log('WebSocket connected');
+    console.log("WebSocket connected");
   };
 
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log('Message from server:', data);
+      console.log("Message from server:", data);
 
-      if (data.type === 'result') {
+      if (data.type === "result") {
         placeholder.textContent = data.text;
         speak(data.text);
       }
     } catch (err) {
-      console.error('Invalid message from server:', err);
+      console.error("Invalid message from server:", err);
     }
   };
 
-  socket.onerror = (err) => {
+  socket.onclose = (err) => {
     console.error('WebSocket error:', err);
   };
 
@@ -71,18 +71,18 @@ connectWebSocket();
 // Capture current video frame as base64 JPEG
 function captureFrameAsBase64() {
   if (!video.videoWidth || !video.videoHeight) {
-    console.error('Video not ready yet');
+    console.error("Video not ready yet");
     return null;
   }
 
-  const captureCanvas = document.createElement('canvas');
-  captureCanvas.width = video.videoWidth;
-  captureCanvas.height = video.videoHeight;
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-  const captureCtx = captureCanvas.getContext('2d');
-  captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  return captureCanvas.toDataURL('image/jpeg', 0.8);
+  return canvas.toDataURL("image/jpeg", 0.8);
 }
 
 // Send a captured frame to the backend
@@ -109,13 +109,30 @@ function sendFrame() {
 
 // Start live video feed from rear camera
 button.addEventListener('click', async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+  
+      video.srcObject = stream;
+      videoTrack = stream.getVideoTracks()[0];
+  
+      video.style.display = 'block';
+      placeholder.style.display = 'none';
+      overlay.style.display = 'block';
 
-    video.srcObject = stream;
-    videoTrack = stream.getVideoTracks()[0];
+      if(ttsEnabled){
+        speak("Camera is now on");
+      }
+  
+    } catch (err) {
+      console.error(err);
+      alert('Camera access denied or not available.');
+      if(ttsEnabled){
+        speak("Camera access denied or not available");
+      }
+    }
+  });
 
     video.style.display = 'block';
     placeholder.style.display = 'none';
@@ -186,11 +203,12 @@ mainView.addEventListener('click', () => {
   lastTap = now;
 });
 
-// Text-to-speech
+// Function of actually speaking
 function speak(text) {
   if (!ttsEnabled) return;
 
   const utterance = new SpeechSynthesisUtterance(text);
+
   const length = text.length;
   let soundLevel;
 
@@ -198,17 +216,20 @@ function speak(text) {
     soundLevel = 1.2;
     utterance.rate = 1.15;
     utterance.pitch = 1.2;
-  } else if (length < 80) {
+  } 
+  else if (length < 80) {
     soundLevel = 1.0;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
-  } else {
+  } 
+  else {
     soundLevel = 0.8;
     utterance.rate = 0.85;
     utterance.pitch = 0.9;
   }
 
   utterance.volume = Math.max(0, Math.min(1, soundLevel * ttsVolume));
+
   speechSynthesis.speak(utterance);
 }
 
@@ -229,7 +250,12 @@ textSizeArea.addEventListener('click', (e) => {
     textSize = Math.min(2, +(textSize + 0.1).toFixed(2));
   }
 
-  placeholder.style.fontSize = textSize + 'rem';
+  placeholder.style.fontSize = textSize + "rem";
+
+  if (ttsEnabled) {
+    speak(`Font size is now set to ${Math.round(textSize * 100)}%`);
+  }
+
 });
 
 // TTS volume — left half = quieter, right half = louder
@@ -248,9 +274,18 @@ ttsVolumeArea.addEventListener('click', (e) => {
 
 // TTS on/off toggle
 ttsToggleRow.addEventListener('click', () => {
-  ttsEnabled = !ttsEnabled;
-  ttsToggle.checked = ttsEnabled;
-  ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+    ttsEnabled = !ttsEnabled;
+    ttsToggle.checked = ttsEnabled;
+  
+    ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
+
+    if (ttsEnabled) {
+      speak('Voice output is now turned on.');
+    } else {
+      ttsEnabled = !ttsEnabled;
+      speak('Voice output is now turned off.');
+      ttsEnabled = !ttsEnabled;
+    }
 });
 
 // Close settings
@@ -258,7 +293,7 @@ closeSettings.addEventListener('click', () => {
   settingsPanel.style.display = 'none';
 });
 
-// Connect WebSocket on page load
-window.addEventListener('load', () => {
+// Connect WebSocket on load
+window.addEventListener("load", () => {
   connectWebSocket();
 });
