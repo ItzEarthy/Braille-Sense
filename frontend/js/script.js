@@ -8,22 +8,31 @@ const flash = document.getElementById('flash-overlay');
 const settingsPanel = document.getElementById('settings-panel');
 const closeSettings = document.getElementById('close-settings');
 const ttsToggle = document.getElementById('tts-toggle');
-const settings = document.getElementById("setting-button");
+const settings = document.getElementById('setting-button');
 const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-//Variables
+const canvas = document.getElementById('freeze-frame');
+const ctx = canvas.getContext('2d');
+
+// Variables
 let lastTap = 0;
 let videoTrack = null;
 let ttsVolume = 1;
 let ttsEnabled = false;
 let textSize = 1;
+let socket = null;
+let isFrozen = false;
 
-// Connect to backend WebSocket (single definition, with retry)
+// Connect to backend WebSocket
+// URL: /ws/ — must match nginx location /ws/ block
 function connectWebSocket(retries = 5) {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  socket = new WebSocket(`${protocol}://${window.location.host}/ws/`);
+  const wsUrl = `${protocol}://${window.location.host}/ws/`;
+
+  console.log(`Connecting to WebSocket: ${wsUrl}`);
+  socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
     console.log('WebSocket connected');
@@ -50,12 +59,16 @@ function connectWebSocket(retries = 5) {
   socket.onclose = () => {
     console.log('WebSocket closed');
     if (retries > 0) {
+      console.log(`Retrying WebSocket... (${retries} attempts left)`);
       setTimeout(() => connectWebSocket(retries - 1), 1000);
+    } else {
+      console.error('WebSocket failed after all retries');
     }
   };
 }
+connectWebSocket();
 
-// Capture current frame from video as base64
+// Capture current video frame as base64 JPEG
 function captureFrameAsBase64() {
   if (!video.videoWidth || !video.videoHeight) {
     console.error('Video not ready yet');
@@ -72,7 +85,29 @@ function captureFrameAsBase64() {
   return captureCanvas.toDataURL('image/jpeg', 0.8);
 }
 
-// Start live video feed from camera
+// Send a captured frame to the backend
+function sendFrame() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn('WebSocket not connected — cannot send frame');
+    return;
+  }
+
+  const base64Image = captureFrameAsBase64();
+  if (!base64Image) {
+    console.error('Could not capture image');
+    return;
+  }
+
+  socket.send(JSON.stringify({
+    type: 'image',
+    image: base64Image,
+    timestamp: Date.now()
+  }));
+
+  console.log('Image sent to backend');
+}
+
+// Start live video feed from rear camera
 button.addEventListener('click', async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -82,22 +117,23 @@ button.addEventListener('click', async () => {
     video.srcObject = stream;
     videoTrack = stream.getVideoTracks()[0];
 
-  settings.addEventListener('click', () =>{
-    toggleSettings();
+    video.style.display = 'block';
+    placeholder.style.display = 'none';
+    overlay.style.display = 'block';
 
-    if (ttsEnabled) {
-      const isOpen = settingsPanel.style.display === 'block';
-      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
-    }
+  } catch (err) {
+    console.error(err);
+    alert('Camera access denied or not available.');
+  }
+});
 
-// Settings button
+// Settings button click
 settings.addEventListener('click', () => {
   toggleSettings();
 });
 
-// Tap video to freeze frame and send to backend
+// Tap live video → freeze frame and send to backend
 video.addEventListener('click', () => {
-  // If frozen → unfreeze
   if (isFrozen) {
     canvas.style.display = 'none';
     video.style.display = 'block';
@@ -106,12 +142,12 @@ video.addEventListener('click', () => {
     return;
   }
 
-  // Draw current frame onto canvas
+  // Draw frame onto visible canvas
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // Show frozen frame, hide live video
+  // Show frozen frame
   canvas.style.display = 'block';
   video.style.display = 'none';
   isFrozen = true;
@@ -119,38 +155,16 @@ video.addEventListener('click', () => {
   // Flash effect
   flash.style.transition = 'none';
   flash.style.opacity = 0;
-
-  flash.offsetHeight;
-
+  flash.offsetHeight; // force reflow
   flash.style.transition = 'opacity 0.1s ease-in-out';
   flash.style.opacity = 0.8;
+  setTimeout(() => { flash.style.opacity = 0; }, 100);
 
-  setTimeout(() => {
-    flash.style.opacity = 0;
-  }, 100);
-
-  // Send image (optional: real image instead of placeholder)
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    const base64Image = captureFrameAsBase64();
-
-    if (!base64Image) {
-      console.error('Could not capture image.');
-      return;
-    }
-
-    socket.send(JSON.stringify({
-      type: 'image',
-      image: base64Image,
-      timestamp: Date.now()
-    }));
-
-    console.log('Image sent to backend');
-  } else {
-    console.warn('WebSocket not connected');
-  }
+  // Send captured frame to backend
+  sendFrame();
 });
 
-// Tap frozen canvas to unfreeze
+// Tap frozen canvas → unfreeze
 canvas.addEventListener('click', () => {
   if (isFrozen) {
     canvas.style.display = 'none';
@@ -160,64 +174,13 @@ canvas.addEventListener('click', () => {
   }
 });
 
-function connectWebSocket(retries = 5) {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  socket = new WebSocket(`${protocol}://${window.location.host}/ws/`);
-
-  socket.onopen = () => {
-    console.log('WebSocket connected');
-  };
-
-  socket.onmessage = (event) => {
-    console.log('Message from backend:', event.data);
-  };
-
-  socket.onerror = (err) => {
-    console.error('WebSocket error:', err);
-  };
-
-  socket.onclose = () => {
-    console.log('WebSocket closed');
-
-    if(ttsEnabled){
-      speak("Photo Taken");
-    }
-
-    setTimeout(() => {
-      flash.style.opacity = 0;
-    }, 100);
-  if (!imageData) {
-    alert("Could not capture image.");
-    return;
-  }
-
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    alert("WebSocket is not connected.");
-    return;
-  }
-
-  socket.send(JSON.stringify({
-    type: "image",
-    image: imageData,
-    timestamp: Date.now()
-  }));
-
-  console.log("Image sent to backend");
-});
-
-// Detect double tap (mobile) + double click (desktop) for settings
+// Double-tap main view to open/close settings
 mainView.addEventListener('click', () => {
   const now = Date.now();
   const timeBetween = now - lastTap;
 
   if (timeBetween < 300 && timeBetween > 0) {
     toggleSettings();
-
-    if (ttsEnabled) {
-      const isOpen = settingsPanel.style.display === 'block';
-      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
-    }
-
   }
 
   lastTap = now;
@@ -229,7 +192,6 @@ function speak(text) {
 
   const utterance = new SpeechSynthesisUtterance(text);
   const length = text.length;
-
   let soundLevel;
 
   if (length < 20) {
@@ -250,13 +212,13 @@ function speak(text) {
   speechSynthesis.speak(utterance);
 }
 
-// Toggle settings panel
+// Toggle settings panel open/closed
 function toggleSettings() {
   const isOpen = settingsPanel.style.display === 'block';
   settingsPanel.style.display = isOpen ? 'none' : 'block';
 }
 
-// Text size controls
+// Text size — left half = smaller, right half = larger
 textSizeArea.addEventListener('click', (e) => {
   const rect = textSizeArea.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -270,38 +232,30 @@ textSizeArea.addEventListener('click', (e) => {
   placeholder.style.fontSize = textSize + 'rem';
 });
 
-// TTS volume controls
+// TTS volume — left half = quieter, right half = louder
 ttsVolumeArea.addEventListener('click', (e) => {
-    if (!ttsEnabled) return;
-  
-    const rect = ttsVolumeArea.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-  
-    if (x < rect.width / 2) {
-      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
-    } else {
-      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
-    }
+  if (!ttsEnabled) return;
 
-    if (ttsEnabled) {
-      speak(`Voice volume is now set to ${Math.round(ttsVolume * 100)}%`);
-    }
-  
+  const rect = ttsVolumeArea.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  if (x < rect.width / 2) {
+    ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+  } else {
+    ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+  }
 });
 
-// TTS toggle
+// TTS on/off toggle
 ttsToggleRow.addEventListener('click', () => {
   ttsEnabled = !ttsEnabled;
   ttsToggle.checked = ttsEnabled;
   ttsVolumeArea.classList.toggle('disabled', !ttsEnabled);
 });
 
-// Close settings button
+// Close settings
 closeSettings.addEventListener('click', () => {
-    settingsPanel.style.display = 'none';
-    if (ttsEnabled) {
-      speak('Settings Closed');
-    } 
+  settingsPanel.style.display = 'none';
 });
 
 // Connect WebSocket on page load
