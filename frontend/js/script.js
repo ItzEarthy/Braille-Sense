@@ -8,27 +8,30 @@ const flash = document.getElementById('flash-overlay');
 const settingsPanel = document.getElementById('settings-panel');
 const closeSettings = document.getElementById('close-settings');
 const ttsToggle = document.getElementById('tts-toggle');
-const settings = document.getElementById("setting-button");
+const settings = document.getElementById('setting-button');
 const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
 
-//Variables
+const canvas = document.getElementById('freeze-frame');
+const ctx = canvas.getContext('2d');
+
+// Variables
 let lastTap = 0;
 let videoTrack = null;
 let ttsVolume = 1;
 let ttsEnabled = false;
 let textSize = 1;
 let socket = null;
+let isFrozen = false;
 
 // Connect to backend WebSocket
-function connectWebSocket() {
-  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-  //Testing to run online
-  const wsUrl = `${protocol}://${window.location.host}/ws`;
-  //To run locally 
-  //const wsUrl = `${protocol}://${window.location.hostname}:11112`;
+// URL: /ws/ — must match nginx location /ws/ block
+function connectWebSocket(retries = 5) {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${protocol}://${window.location.host}/ws/`;
 
+  console.log(`Connecting to WebSocket: ${wsUrl}`);
   socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
@@ -49,16 +52,23 @@ function connectWebSocket() {
     }
   };
 
-  socket.onclose = () => {
-    console.log("WebSocket disconnected");
+  socket.onclose = (err) => {
+    console.error('WebSocket error:', err);
   };
 
-  socket.onerror = (err) => {
-    console.error("WebSocket error:", err);
+  socket.onclose = () => {
+    console.log('WebSocket closed');
+    if (retries > 0) {
+      console.log(`Retrying WebSocket... (${retries} attempts left)`);
+      setTimeout(() => connectWebSocket(retries - 1), 1000);
+    } else {
+      console.error('WebSocket failed after all retries');
+    }
   };
 }
+connectWebSocket();
 
-// Capture current frame from video
+// Capture current video frame as base64 JPEG
 function captureFrameAsBase64() {
   if (!video.videoWidth || !video.videoHeight) {
     console.error("Video not ready yet");
@@ -75,7 +85,29 @@ function captureFrameAsBase64() {
   return canvas.toDataURL("image/jpeg", 0.8);
 }
 
-//starts live video feed from phone
+// Send a captured frame to the backend
+function sendFrame() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn('WebSocket not connected — cannot send frame');
+    return;
+  }
+
+  const base64Image = captureFrameAsBase64();
+  if (!base64Image) {
+    console.error('Could not capture image');
+    return;
+  }
+
+  socket.send(JSON.stringify({
+    type: 'image',
+    image: base64Image,
+    timestamp: Date.now()
+  }));
+
+  console.log('Image sent to backend');
+}
+
+// Start live video feed from rear camera
 button.addEventListener('click', async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -100,73 +132,63 @@ button.addEventListener('click', async () => {
         speak("Camera access denied or not available");
       }
     }
-  });
-
-  settings.addEventListener('click', () =>{
-    toggleSettings();
-
-    if (ttsEnabled) {
-      const isOpen = settingsPanel.style.display === 'block';
-      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
-    }
-
-  });
-
-//flash for when user takes photo
-video.addEventListener('click', () => {
-  flash.style.transition = 'none';
-  flash.style.opacity = 0;
-
-  flash.offsetHeight;
-
-  flash.style.transition = 'opacity 0.1s ease-in-out';
-  flash.style.opacity = 0.8;
-
-  setTimeout(() => {
-    flash.style.opacity = 0;
-  }, 100);
-
-  const imageData = captureFrameAsBase64();
-
-    if(ttsEnabled){
-      speak("Photo Taken");
-    }
-
-    setTimeout(() => {
-      flash.style.opacity = 0;
-    }, 100);
-  if (!imageData) {
-    alert("Could not capture image.");
-    return;
-  }
-
-  if (!socket || socket.readyState !== WebSocket.OPEN) {
-    alert("WebSocket is not connected.");
-    return;
-  }
-
-  socket.send(JSON.stringify({
-    type: "image",
-    image: imageData,
-    timestamp: Date.now()
-  }));
-
-  console.log("Image sent to backend");
 });
 
-// Detect double tap (mobile) + double click (desktop) for settings
+
+// Settings button click
+settings.addEventListener('click', () => {
+  toggleSettings();
+});
+
+// Tap live video → freeze frame and send to backend
+video.addEventListener('click', () => {
+  if (isFrozen) {
+    canvas.style.display = 'none';
+    video.style.display = 'block';
+    isFrozen = false;
+    console.log('Camera resumed');
+    return;
+  }
+
+  // Draw frame onto visible canvas
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  // Show frozen frame
+  canvas.style.display = 'block';
+  video.style.display = 'none';
+  isFrozen = true;
+
+  // Flash effect
+  flash.style.transition = 'none';
+  flash.style.opacity = 0;
+  flash.offsetHeight; // force reflow
+  flash.style.transition = 'opacity 0.1s ease-in-out';
+  flash.style.opacity = 0.8;
+  setTimeout(() => { flash.style.opacity = 0; }, 100);
+
+  // Send captured frame to backend
+  sendFrame();
+});
+
+// Tap frozen canvas → unfreeze
+canvas.addEventListener('click', () => {
+  if (isFrozen) {
+    canvas.style.display = 'none';
+    video.style.display = 'block';
+    isFrozen = false;
+    console.log('Camera resumed');
+  }
+});
+
+// Double-tap main view to open/close settings
 mainView.addEventListener('click', () => {
   const now = Date.now();
   const timeBetween = now - lastTap;
 
   if (timeBetween < 300 && timeBetween > 0) {
     toggleSettings();
-
-    if (ttsEnabled) {
-      const isOpen = settingsPanel.style.display === 'block';
-      speak(isOpen ? 'Settings are now open.' : 'Settings are now closed.');
-    }
-
   }
 
   lastTap = now;
@@ -179,7 +201,6 @@ function speak(text) {
   const utterance = new SpeechSynthesisUtterance(text);
 
   const length = text.length;
-
   let soundLevel;
 
   if (length < 20) {
@@ -203,12 +224,13 @@ function speak(text) {
   speechSynthesis.speak(utterance);
 }
 
-//shows and closes settings
+// Toggle settings panel open/closed
 function toggleSettings() {
   const isOpen = settingsPanel.style.display === 'block';
   settingsPanel.style.display = isOpen ? 'none' : 'block';
 }
 
+// Text size — left half = smaller, right half = larger
 textSizeArea.addEventListener('click', (e) => {
   const rect = textSizeArea.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -227,25 +249,21 @@ textSizeArea.addEventListener('click', (e) => {
 
 });
 
+// TTS volume — left half = quieter, right half = louder
 ttsVolumeArea.addEventListener('click', (e) => {
-    if (!ttsEnabled) return;
-  
-    const rect = ttsVolumeArea.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-  
-    if (x < rect.width / 2) {
-      ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
-    } else {
-      ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
-    }
+  if (!ttsEnabled) return;
 
-    if (ttsEnabled) {
-      speak(`Voice volume is now set to ${Math.round(ttsVolume * 100)}%`);
-    }
-  
+  const rect = ttsVolumeArea.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+
+  if (x < rect.width / 2) {
+    ttsVolume = Math.max(0, +(ttsVolume - 0.1).toFixed(2));
+  } else {
+    ttsVolume = Math.min(1, +(ttsVolume + 0.1).toFixed(2));
+  }
 });
 
-// checks to see if text to speech is enabled
+// TTS on/off toggle
 ttsToggleRow.addEventListener('click', () => {
     ttsEnabled = !ttsEnabled;
     ttsToggle.checked = ttsEnabled;
@@ -261,12 +279,9 @@ ttsToggleRow.addEventListener('click', () => {
     }
 });
 
-// Close button
+// Close settings
 closeSettings.addEventListener('click', () => {
-    settingsPanel.style.display = 'none';
-    if (ttsEnabled) {
-      speak('Settings Closed');
-    } 
+  settingsPanel.style.display = 'none';
 });
 
 // Connect WebSocket on load
