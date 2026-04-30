@@ -132,17 +132,8 @@ button.addEventListener('click', async () => {
         speak("Camera access denied or not available");
       }
     }
-  });
-
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-    overlay.style.display = 'block';
-
-  } catch (err) {
-    console.error(err);
-    alert('Camera access denied or not available.');
-  }
 });
+
 
 // Settings button click
 settings.addEventListener('click', () => {
