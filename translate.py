@@ -6,7 +6,11 @@ import string
 from nltk.stem import WordNetLemmatizer
 #from blobdetect import blobs
 
-#blob = blobs.split(" ") / if the string of blobs are one string seperated by spaces
+blob1 = ["100000","110000","100100"] #check letter translation
+blob2 = ["001111","100000","110000","110000","100000"] #check number
+blob3 = ["011011","011011"] #check parenthesis
+#blob = blobs.split(" ") / if the string of blobs are one string seperated by spaces, or split into 6's
+
 #alphabet
 letters = {
     "100000" : "a",
@@ -46,7 +50,8 @@ letters = {
     "011011" : "parenthesis",
     "001111" : "#",
     "000011" : "letterPrefix",
-    "000001" : "capital"
+    "000001" : "capital",
+    "000000" : " " #if there are spaces, create a new word 
 }
 
 numbers = {
@@ -92,6 +97,7 @@ captials = {
 }
 
 word = ""
+#if blob == null:
 #remaining = blob
 #for b in blob:
 #    for a in letters : 
@@ -101,7 +107,7 @@ word = ""
 #           elif a == "captial" :
 #               word = word + capitals(a)
 #           else :
-#               word = word + letters(a)h
+#               word = word + letters(a)
 #           
 #create an unswapped string of letters without numbers yet
 
