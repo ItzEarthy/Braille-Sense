@@ -10,7 +10,7 @@ blob1 = ["100000","110000","100100"] #check letter translation
 blob2 = ["001111","100000","110000","110000","100000"] #check number
 blob3 = ["011011","011011"] #check parenthesis
 #blob = blobs.split(" ") / if the string of blobs are one string seperated by spaces, or split into 6's
-
+words = []
 #alphabet
 letters = {
     "100000" : "a",
@@ -51,7 +51,7 @@ letters = {
     "001111" : "#",
     "000011" : "letterPrefix",
     "000001" : "capital",
-    "000000" : " " #if there are spaces, create a new word 
+    "000000" : " " 
 }
 
 numbers = {
@@ -97,29 +97,36 @@ captials = {
 }
 
 word = ""
-#if blob == null:
-#remaining = blob
-#for b in blob:
-#    for a in letters : 
-#       if b == a :
-#           if a == "#" :
-#               word = word + numberSwap(remaining)
-#           elif a == "captial" :
-#               word = word + capitals(a)
-#           else :
-#               word = word + letters(a)
-#           
-#create an unswapped string of letters without numbers yet
+blob = blob1
+p = False
+if blob.length <= 0 : 
+    print("error blob has no elements")
+for i in blob :
+    if blob[i].length != 6 :
+        print("error letter length is not in Braille format")
+    else :
+        if blob[i] in letters:
+            if letters[blob[i]] == "capital":
+                word = word + captials[blob[i+1]]
+            else:
+                word = word + letters[blob[i]]
+            if letters[blob[i]] == "#":
+                for j in range(i+1, len(blob)):
+                    if blob[j] == "000011":
+                        break
+                    if blob[j] in numbers:
+                        word = word + numbers[blob[j]]
+                    else:
+                        break
+            if letters[blob[i]] == "parenthesis":
+                if not p:
+                    word = word + "("
+                    p = True
+                else:
+                    word = word + ")"
+                    p = False
+            if letters[blob[i]] == " ":
+                words.append(word)
+                word = ""
 
-#def string numberSwap(blobs):
-#   if blobs == null
-#       return ""
-#   string word = ""
-#   for b in blobs :
-#       for n in numbers :
-#           if b == "000011" :
-#               return word
-#           if b == n :
-#               word = word + n
-#   return word
   
