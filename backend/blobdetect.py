@@ -65,7 +65,10 @@ def _make_blob_detector():
     params.maxThreshold = 255
     params.filterByArea = True
     params.minArea = 5
-    params.maxArea = 3000
+    # Bumped from 3000 to 8000: close-up shots (~6 in away) produce dots that
+    # are 50-80 px in diameter, easily exceeding 3000 px² area. Size-consistency
+    # filtering downstream rejects the resulting oversized noise.
+    params.maxArea = 8000
     # Relaxed shape filters: 3D braille dots viewed with side-lighting often
     # appear as crescents in the binary image (one side highlight, one side
     # shadow). Strict circularity/convexity filters were rejecting these.
@@ -92,6 +95,58 @@ def _size_consistency(keypoints):
     var = sum((s - mean) ** 2 for s in sizes) / len(sizes)
     cv = math.sqrt(var) / mean
     return 1.0 / (1.0 + cv * 2.0)
+
+def _spacing_regularity(keypoints):
+    """Returns 1.0 if every dot's nearest-neighbor distance is the same
+    (real braille — dots are deliberately placed at a fixed pitch),
+    → 0 for randomly-spaced wall/floor texture."""
+    pts = [kp.pt for kp in keypoints]
+    if len(pts) < 3:
+        return 1.0
+    min_dists = []
+    for i, p1 in enumerate(pts):
+        d = min(math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+                for j, p2 in enumerate(pts) if i != j)
+        min_dists.append(d)
+    mean = sum(min_dists) / len(min_dists)
+    if mean <= 0:
+        return 0.0
+    var = sum((d - mean) ** 2 for d in min_dists) / len(min_dists)
+    cv = math.sqrt(var) / mean
+    return 1.0 / (1.0 + cv * 1.5)
+
+def _largest_spatial_cluster(keypoints, search_radius_factor=5.0):
+    """Group keypoints by spatial proximity (flood fill within
+    search_radius_factor × median nearest-neighbor distance) and return
+    the largest group. Drops isolated outlier dots far from the main braille."""
+    if len(keypoints) <= 1:
+        return list(keypoints)
+    pts = [kp.pt for kp in keypoints]
+    min_dists = []
+    for i, p1 in enumerate(pts):
+        d = min(math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+                for j, p2 in enumerate(pts) if i != j)
+        min_dists.append(d)
+    median = sorted(min_dists)[len(min_dists) // 2] if min_dists else 10.0
+    radius = max(median * search_radius_factor, 25.0)
+
+    clusters = []
+    visited = set()
+    for i, p in enumerate(pts):
+        if i in visited:
+            continue
+        cluster = [keypoints[i]]
+        visited.add(i)
+        queue = [p]
+        while queue:
+            curr = queue.pop(0)
+            for j, op in enumerate(pts):
+                if j not in visited and math.hypot(curr[0] - op[0], curr[1] - op[1]) <= radius:
+                    visited.add(j)
+                    cluster.append(keypoints[j])
+                    queue.append(op)
+        clusters.append(cluster)
+    return max(clusters, key=len)
 
 def _filter_by_size_consistency(keypoints, tolerance=0.4):
     """Keep keypoints whose diameter is within ±tolerance of the median."""
@@ -351,9 +406,14 @@ def detect_3d_braille(image_path):
                 density = num_dots / area
 
                 # Real braille dots are all the same size; wall/carpet noise
-                # has wildly varying blob sizes. Weighting by size consistency
-                # makes real braille beat denser-but-irregular noise clusters.
+                # has wildly varying blob sizes.
                 consistency = _size_consistency(cluster)
+
+                # Real braille is on a fixed-pitch grid → nearest-neighbor
+                # distances are very tight. Random texture noise has loose,
+                # varied spacing. This is what separates a wall-texture cluster
+                # of similar-sized bumps from a real braille cluster.
+                regularity = _spacing_regularity(cluster)
 
                 # Reject extreme aspect ratios — real braille plates are
                 # roughly rectangular, not pencil-thin.
@@ -361,7 +421,9 @@ def detect_3d_braille(image_path):
                 if aspect > 12.0:
                     continue
 
-                score = density * math.sqrt(num_dots) * (consistency ** 2)
+                score = (density * math.sqrt(num_dots)
+                         * (consistency ** 2)
+                         * (regularity ** 2))
 
                 if score > best_score:
                     best_score = score
@@ -391,6 +453,10 @@ def detect_3d_braille(image_path):
             # Drop blobs that are noticeably smaller/larger than the median —
             # on a deskewed plate the real dots are uniform; outliers are noise.
             flat_keypoints = _filter_by_size_consistency(flat_keypoints, tolerance=0.4)
+            # Drop spatially isolated stray dots (e.g. noise blobs at the edges
+            # of the deskewed plate). Real braille forms one connected group
+            # under a generous proximity radius.
+            flat_keypoints = _largest_spatial_cluster(flat_keypoints, search_radius_factor=5.0)
 
             if flat_keypoints:
                 flat_unit = _estimate_unit_spacing(flat_keypoints)
