@@ -4,12 +4,8 @@ import numpy
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-#from blobdetect import blobs
+from blobdetect import binary
 
-blob1 = ["100000","110000","100100"] #check letter translation
-blob2 = ["001111","100000","110000","110000","100000"] #check number
-blob3 = ["011011","011011"] #check parenthesis
-#blob = blobs.split(" ") / if the string of blobs are one string seperated by spaces, or split into 6's
 words = []
 
 #alphabet
@@ -96,9 +92,9 @@ captials = {
     "101111" : "Y",
     "101011" : "Z"
 }
-def translate(blobs):
+def translate(binary):
     word = ""
-    blob = blobs
+    blob = binary
     p = False
     if blob.length <= 0 : 
         print("error blob has no elements")
