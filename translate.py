@@ -6,7 +6,7 @@ import string
 from nltk.stem import WordNetLemmatizer
 from blobdetect import binary
 
-words = []
+wordss = []
 
 #alphabet
 letters = {
@@ -123,7 +123,7 @@ def translate(binary):
                         word = word + ")"
                         p = False
                 if letters[blob[i]] == " ":
-                    words.append(word)
+                    wordss.append(word)
                     word = ""
 
   

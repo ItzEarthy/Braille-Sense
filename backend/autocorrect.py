@@ -2,14 +2,13 @@ import nltk
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-from translate import words 
+from translate import wordss 
 
 # Download required NLTK data
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
-print("Upload your text dataset (final.txt)")
-uploaded = words.upload()
+uploaded = wordss.upload()
 
 file_name = list(uploaded.keys())[0]
 with open(file_name, 'r', encoding="utf8") as f:
