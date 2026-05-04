@@ -27,6 +27,9 @@ def order_points(pts):
     return rect
 
 def deskew_image(img, corners):
+    """Returns (warped_image, perspective_matrix). The matrix can be reused
+    via cv2.perspectiveTransform to map points from the original image into
+    the deskewed coordinate space."""
     rect = order_points(corners)
     (tl, tr, br, bl) = rect
     widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
@@ -42,7 +45,24 @@ def deskew_image(img, corners):
         [0, maxHeight - 1]
     ], dtype="float32")
     matrix = cv2.getPerspectiveTransform(rect, dst)
-    return cv2.warpPerspective(img, matrix, (maxWidth, maxHeight))
+    warped = cv2.warpPerspective(img, matrix, (maxWidth, maxHeight))
+    return warped, matrix
+
+def _transform_keypoints(keypoints, matrix):
+    """Apply a perspective matrix to a list of keypoints (positions + sizes
+    are preserved, sizes are not rescaled — fine for clustering, dot pitch
+    is re-estimated downstream from the transformed positions)."""
+    if not keypoints:
+        return []
+    pts = np.array(
+        [[[float(kp.pt[0]), float(kp.pt[1])]] for kp in keypoints],
+        dtype=np.float32,
+    )
+    transformed = cv2.perspectiveTransform(pts, matrix)
+    return [
+        cv2.KeyPoint(float(p[0][0]), float(p[0][1]), kp.size)
+        for kp, p in zip(keypoints, transformed)
+    ]
 # ----------------------------------
 
 # --- DETECTION PIPELINE HELPERS ---
@@ -222,6 +242,15 @@ def keypoints_to_braille_binary(keypoints, unit):
                 lines.append(current)
                 current = [r]
         lines.append(current)
+
+    # Drop "lines" that are clearly minor compared to the largest — these are
+    # almost always noise dots near the edge of the deskewed plate. A real
+    # secondary line of braille text is rarely < 25% the size of the main one.
+    if len(lines) > 1:
+        line_sizes = [sum(len(r['pts']) for r in line) for line in lines]
+        max_size = max(line_sizes)
+        threshold = max(2, max_size * 0.25)
+        lines = [line for line, size in zip(lines, line_sizes) if size >= threshold]
 
     cell_stride_x = unit * CELL_STRIDE_X_U
     result = []
@@ -445,18 +474,24 @@ def detect_3d_braille(image_path):
             plate_corners = np.int32(corners)
 
             # Deskew the *clean* original image so the flat image has no overlay.
-            flat_img = deskew_image(img.copy(), plate_corners)
+            flat_img, warp_matrix = deskew_image(img.copy(), plate_corners)
 
             # Re-detect on the deskewed plate for cleaner, axis-aligned dots.
             flat_inverted = _preprocess_for_blobs(flat_img)
-            flat_keypoints = detector.detect(flat_inverted)
-            # Drop blobs that are noticeably smaller/larger than the median —
-            # on a deskewed plate the real dots are uniform; outliers are noise.
-            flat_keypoints = _filter_by_size_consistency(flat_keypoints, tolerance=0.4)
-            # Drop spatially isolated stray dots (e.g. noise blobs at the edges
-            # of the deskewed plate). Real braille forms one connected group
-            # under a generous proximity radius.
-            flat_keypoints = _largest_spatial_cluster(flat_keypoints, search_radius_factor=5.0)
+            redetected = detector.detect(flat_inverted)
+            redetected = _filter_by_size_consistency(redetected, tolerance=0.4)
+            redetected = _largest_spatial_cluster(redetected, search_radius_factor=5.0)
+
+            # Fallback: if re-detection lost a significant fraction of the
+            # original cluster's dots (happens when the deskewed crop is small
+            # and the preprocessing params don't suit it — e.g. distant/dark
+            # plates), reuse the original cluster's keypoints transformed into
+            # the deskewed coordinate space. The original detection already
+            # validated these as real dots.
+            if len(redetected) < max(4, int(len(best_cluster) * 0.6)):
+                flat_keypoints = _transform_keypoints(best_cluster, warp_matrix)
+            else:
+                flat_keypoints = redetected
 
             if flat_keypoints:
                 flat_unit = _estimate_unit_spacing(flat_keypoints)
