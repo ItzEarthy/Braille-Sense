@@ -8,3 +8,4 @@ dist/
 /.env.local
 package-lock.json
 .venv/
+/backend/__pycache__
