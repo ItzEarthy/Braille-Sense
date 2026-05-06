@@ -51,7 +51,7 @@ function connectWebSocket(retries = 5) {
       }
       if (data.type === "output") {
         textOverlay.style.zIndex = 20;
-        textOverlay.style.display = 'block';
+        textOverlay.style.display = 'flex';
         textOverlay.textContent = data.text;
         speak(data.text);
       }
@@ -149,12 +149,23 @@ settings.addEventListener('click', () => {
   toggleSettings();
 });
 
+textOverlay.addEventListener('click', () => {
+  textOverlay.style.display = 'none';
+  textOverlay.textContent = '';
+  canvas.style.display = 'none';
+  video.style.display = 'block';
+  isFrozen = false;
+  speechSynthesis.cancel();
+});
+
 // Tap live video → freeze frame and send to backend
 video.addEventListener('click', () => {
   if (isFrozen) {
     canvas.style.display = 'none';
     video.style.display = 'block';
     isFrozen = false;
+    textOverlay.style.display = 'none';  // ADD THIS
+    textOverlay.textContent = '';         // ADD THIS
     console.log('Camera resumed');
     return;
   }
@@ -187,6 +198,8 @@ canvas.addEventListener('click', () => {
     canvas.style.display = 'none';
     video.style.display = 'block';
     isFrozen = false;
+    textOverlay.style.display = 'none';  // ADD THIS
+    textOverlay.textContent = '';         // ADD THIS
     console.log('Camera resumed');
   }
 });
