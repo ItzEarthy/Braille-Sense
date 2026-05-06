@@ -1,3 +1,5 @@
+const { BlockList } = require("net");
+
 //HTHML Elements
 const button = document.getElementById('enable-camera');
 const video = document.getElementById('camera-feed');
@@ -12,6 +14,7 @@ const settings = document.getElementById('setting-button');
 const textSizeArea = document.getElementById('text-size-area');
 const ttsVolumeArea = document.getElementById('tts-volume-area');
 const ttsToggleRow = document.getElementById('tts-toggle-row');
+const textOverlay = document.getElementById('text-overlay');
 
 const canvas = document.getElementById('freeze-frame');
 const ctx = canvas.getContext('2d');
@@ -47,6 +50,13 @@ function connectWebSocket(retries = 5) {
         placeholder.textContent = data.text;
         speak(data.text);
       }
+      if (data.type === "output") {
+        textOverlay.style.zIndex = 20;
+        textOverlay.style.display = block;
+        textOverlay.textContent = data.text;
+        speak(data.text);
+      }
+
     } catch (err) {
       console.error("Invalid message from server:", err);
     }
