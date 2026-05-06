@@ -1,4 +1,3 @@
-const { BlockList } = require("net");
 
 //HTHML Elements
 const button = document.getElementById('enable-camera');
