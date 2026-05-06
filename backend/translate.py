@@ -1,10 +1,8 @@
-import nltk
-import cv2 #import possible dependancies from blobdetect
-import numpy 
-import re
-import string
-from nltk.stem import WordNetLemmatizer
-from blobdetect import binary
+# import nltk
+# import cv2 #import possible dependancies from blobdetect
+# import numpy 
+from blobdetect import binary_cells
+from textblob import TextBlob #pip install textblob, MIT license
 
 wordss = []
 
@@ -125,5 +123,9 @@ def translate(binary):
                 if letters[blob[i]] == " ":
                     wordss.append(word)
                     word = ""
+    for w in wordss:
+        blob = TextBlob(w)
+        wordn = blob.correct() #correct the spelling of the word
+        words = words + wordn + " " #make the words a single string
 
-  
+    return words #send words string out
