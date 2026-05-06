@@ -1,9 +1,15 @@
 import cv2
 import numpy as np
 from pathlib import Path
-import tkinter as tk
-from tkinter import ttk, messagebox
+try:
+    import tkinter as tk
+    from tkinter import ttk, messagebox
+    HAVE_TK = True
+except Exception:
+    tk = None
+    HAVE_TK = False
 import math
+import json
 
 TEST_PHOTOS_DIR = Path(__file__).resolve().parent / "Test Photos"
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
@@ -306,7 +312,7 @@ def open_test_photo_dropdown():
     ttk.Button(root, text="Detect Braille", command=run_detection).pack(padx=12, pady=(6, 12))
     root.mainloop()
 
-def detect_3d_braille(image_path):
+def detect_3d_braille(image_path, headless=False):
     img = cv2.imread(image_path)
     if img is None:
         print("Error: Image not found.")
@@ -448,10 +454,185 @@ def detect_3d_braille(image_path):
 
     return binary_cells
 
+
+def detect_3d_braille_from_image(img, headless=False):
+    # Same pipeline as detect_3d_braille but accepts an already-loaded image
+    inverted = _preprocess_for_blobs(img)
+    detector = _make_blob_detector()
+    raw_keypoints = detector.detect(inverted)
+
+    valid_keypoints = []
+    flat_img = None
+    flat_keypoints = []
+    binary_cells = []
+
+    if raw_keypoints:
+        pts = [kp.pt for kp in raw_keypoints]
+
+        min_dists = []
+        for i, p1 in enumerate(pts):
+            dists = [math.hypot(p1[0]-p2[0], p1[1]-p2[1]) for j, p2 in enumerate(pts) if i != j]
+            if dists:
+                min_dists.append(min(dists))
+
+        median_spacing = sorted(min_dists)[len(min_dists)//2] if min_dists else 10
+        search_radius = max(median_spacing * 4.0, 25.0)
+
+        clusters = []
+        visited = set()
+
+        for i, p in enumerate(pts):
+            if i in visited:
+                continue
+            current_cluster = [raw_keypoints[i]]
+            visited.add(i)
+            queue = [p]
+            while queue:
+                curr_p = queue.pop(0)
+                for j, other_p in enumerate(pts):
+                    if j not in visited:
+                        dist = math.hypot(curr_p[0]-other_p[0], curr_p[1]-other_p[1])
+                        if dist <= search_radius:
+                            visited.add(j)
+                            current_cluster.append(raw_keypoints[j])
+                            queue.append(other_p)
+            clusters.append(current_cluster)
+
+        best_cluster = None
+        best_score = 0
+
+        for cluster in clusters:
+            num_dots = len(cluster)
+            if 4 <= num_dots <= 80:
+                xs = [kp.pt[0] for kp in cluster]
+                ys = [kp.pt[1] for kp in cluster]
+                w = max(xs) - min(xs)
+                h = max(ys) - min(ys)
+                area = (w + 1) * (h + 1)
+                density = num_dots / area
+                consistency = _size_consistency(cluster)
+                regularity = _spacing_regularity(cluster)
+                aspect = max(w, h) / max(min(w, h), 1.0)
+                if aspect > 12.0:
+                    continue
+                score = (density * math.sqrt(num_dots) * (consistency ** 2) * (regularity ** 2))
+                if score > best_score:
+                    best_score = score
+                    best_cluster = cluster
+
+        if best_cluster is not None:
+            valid_keypoints = best_cluster
+            cluster_pts = np.array([kp.pt for kp in best_cluster], dtype=np.float32)
+            rect = cv2.minAreaRect(cluster_pts)
+            (cx, cy), (w, h), angle = rect
+            pad = median_spacing * 1.5
+            padded_rect = ((cx, cy), (w + pad, h + pad), angle)
+            corners = cv2.boxPoints(padded_rect)
+            plate_corners = np.int32(corners)
+            flat_img, warp_matrix = deskew_image(img.copy(), plate_corners)
+            flat_inverted = _preprocess_for_blobs(flat_img)
+            redetected = detector.detect(flat_inverted)
+            redetected = _filter_by_size_consistency(redetected, tolerance=0.4)
+            redetected = _largest_spatial_cluster(redetected, search_radius_factor=5.0)
+
+            if len(redetected) < max(4, int(len(best_cluster) * 0.6)):
+                flat_keypoints = _transform_keypoints(best_cluster, warp_matrix)
+            else:
+                flat_keypoints = redetected
+
+            if flat_keypoints:
+                flat_unit = _estimate_unit_spacing(flat_keypoints)
+                binary_cells = keypoints_to_braille_binary(flat_keypoints, flat_unit)
+
+            cv2.drawContours(img, [plate_corners], -1, (255, 0, 0), 2)
+
+    img_with_keypoints = cv2.drawKeypoints(
+        img, valid_keypoints, np.array([]), (0, 0, 255),
+        cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+    )
+
+    flat_with_keypoints = None
+    if flat_img is not None:
+        flat_with_keypoints = cv2.drawKeypoints(
+            flat_img, flat_keypoints, np.array([]), (0, 0, 255),
+            cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
+        )
+
+    if HAVE_TK and not headless:
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            screen_w = root.winfo_screenwidth()
+            screen_h = root.winfo_screenheight()
+            root.destroy()
+        except Exception:
+            screen_w, screen_h = 1920, 1080
+    else:
+        screen_w, screen_h = 1920, 1080
+
+    def show_scaled(title, img_to_show):
+        if img_to_show is None:
+            return
+        if headless:
+            return
+        h, w = img_to_show.shape[:2]
+        max_w = int(screen_w * 0.9)
+        max_h = int(screen_h * 0.8)
+        scale = min(max_w / w, max_h / h, 1.0)
+        disp_w, disp_h = int(w * scale), int(h * scale)
+        if scale < 1.0:
+            disp = cv2.resize(img_to_show, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
+        else:
+            disp = img_to_show
+        cv2.namedWindow(title, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(title, disp_w, disp_h)
+        cv2.imshow(title, disp)
+
+    if not headless:
+        show_scaled("Preprocessed", inverted)
+        show_scaled("Detected 3D Braille", img_with_keypoints)
+        if flat_with_keypoints is not None:
+            show_scaled("Deskewed Plate (Re-detected)", flat_with_keypoints)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    return binary_cells
+
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1:
-        result = detect_3d_braille(sys.argv[1])
-        print("Braille binary:", result)
+    # Simple arg parsing for --from-stdin and --headless
+    args = sys.argv[1:]
+    headless = False
+    if '--headless' in args:
+        headless = True
+        args.remove('--headless')
+
+    if args:
+        if args[0] == '--from-stdin':
+            # Force headless when reading from stdin
+            headless = True
+            data = sys.stdin.buffer.read()
+            if not data:
+                print('Error: no data on stdin', file=sys.stderr)
+                sys.exit(1)
+            arr = np.frombuffer(data, dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if img is None:
+                print('Error: failed to decode image from stdin', file=sys.stderr)
+                sys.exit(2)
+            result = detect_3d_braille_from_image(img, headless=headless)
+        else:
+            result = detect_3d_braille(args[0], headless=headless)
+
+        # Print structured JSON to stdout so the server logs capture it cleanly
+        out = { 'binary': result }
+        sys.stdout.write(json.dumps(out))
+        sys.stdout.flush()
+
+        # Exit code 3 when no binary detected to allow caller to distinguish
+        if not result:
+            sys.exit(3)
+        else:
+            sys.exit(0)
     else:
         open_test_photo_dropdown()

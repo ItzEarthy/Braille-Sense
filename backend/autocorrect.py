@@ -2,7 +2,7 @@ import nltk
 import re
 import string
 from nltk.stem import WordNetLemmatizer
-from translate import wordss 
+from backend.translate import wordss 
 
 # Download required NLTK data
 nltk.download('wordnet')
