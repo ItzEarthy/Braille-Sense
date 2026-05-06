@@ -77,7 +77,7 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        const py = spawn(PY_EXEC, ['blobdetect.py', '--from-stdin', '--headless'], { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
+        const py = spawn(PY_EXEC, ['blobdetect.py', '--from-stdin'], { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
 
         py.on('error', (err) => {
           console.error(`Failed to spawn Python process (${PY_EXEC}): ${err.message}`);
@@ -96,42 +96,17 @@ wss.on('connection', (ws) => {
         });
 
         py.on('close', (code) => {
-          if (stderr) {
-            console.error(`blobdetect stderr for ${filename}: ${stderr.trim()}`);
-          }
-
-          console.log(`blobdetect.py exited with code ${code} for ${filename}`);
-
-          let parsed = null;
           const trimmed = stdout.trim();
+          const errtrim = stderr.trim();
           if (trimmed) {
-            try {
-              parsed = JSON.parse(trimmed);
-              if (parsed && Array.isArray(parsed.binary)) {
-                console.log(`Detected binary for ${filename}: ${JSON.stringify(parsed.binary)}`);
-              } else {
-                console.log(`blobdetect output for ${filename} did not contain 'binary' array`);
-              }
-            } catch (e) {
-              console.error(`Failed to parse blobdetect JSON for ${filename}: ${e.message}`);
-            }
-          } else {
-            console.log(`blobdetect produced no stdout for ${filename}`);
-          }
-
-          if (code === 3) {
-            console.log(`No braille binary detected in ${filename}`);
-            ws.send(JSON.stringify({ type: 'result', binary: [], file: filename, detected: false }));
+            ws.send(JSON.stringify({ type: 'output', text: trimmed}));
             return;
           }
-
-          if (parsed && Array.isArray(parsed.binary)) {
-            ws.send(JSON.stringify({ type: 'result', binary: parsed.binary, file: filename, detected: parsed.binary.length > 0 }));
-          } else if (trimmed) {
-            ws.send(JSON.stringify({ type: 'result', text: trimmed, file: filename }));
-          } else {
-            ws.send(JSON.stringify({ type: 'result', text: (stderr.trim() || `blobdetect exited with code ${code}`), file: filename }));
+          if (errtrim) {
+            ws.send(JSON.stringify({ type: 'output', text: errtrim}));
+            return;
           }
+          ws.send(JSON.stringify({ type: 'output', text: `blobdetect exited with code ${code}`}));
         });
 
         py.stdin.write(imgBuffer);
