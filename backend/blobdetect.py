@@ -1,24 +1,102 @@
 import cv2
 import numpy as np
-from pathlib import Path
-try:
-    import tkinter as tk
-    from tkinter import ttk, messagebox
-    HAVE_TK = True
-except Exception:
-    tk = None
-    HAVE_TK = False
 import math
-import json
+import sys
 
-TEST_PHOTOS_DIR = Path(__file__).resolve().parent / "Test Photos"
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
-
-# Standard braille geometry (unit multipliers)
 CELL_STRIDE_X_U = 2.66
 LINE_STRIDE_Y_U = 4.27
 
-# Deskeweing helpers
+NUMBER_PREFIX = "001111"
+CAPITAL_PREFIX = "000001"
+LETTER_PREFIX = "000011"
+
+#translate vars
+wordss = []
+#alphabet
+letters = {
+    "100000" : "a",
+    "110000" : "b",
+    "100100" : "c",
+    "100110" : "d",
+    "100010" : "e",
+    "110100" : "f",
+    "110110" : "g",
+    "110010" : "h",
+    "010100" : "i",
+    "010110" : "j",
+    "101000" : "k",
+    "111000" : "l",
+    "101100" : "m",
+    "101110" : "n",
+    "101010" : "o",
+    "111100" : "p",
+    "111110" : "q",
+    "111010" : "r",
+    "011100" : "s",
+    "011110" : "t",
+    "101001" : "u",
+    "111001" : "v",
+    "010111" : "w",
+    "101101" : "x",
+    "101111" : "y",
+    "101011" : "z",
+    "010000" : ",",
+    "001000" : "'",
+    "001001" : "-",
+    "010010" : ":",
+    "011000" : ";",
+    "010011" : ".",
+    "011001" : "?",
+    "011010" : "!",
+    "011011" : "parenthesis",
+    "001111" : "#",
+    "000011" : "letterPrefix",
+    "000001" : "capital",
+    "000000" : " " 
+}
+
+numbers = {
+    "a" : "1",
+    "b" : "2",
+    "c" : "3",
+    "d" : "4",
+    "e" : "5",
+    "f" : "6",
+    "g" : "7",
+    "h" : "8",
+    "i" : "9",
+    "j" : "0"
+}
+
+capitals = {
+    "100000" : "A",
+    "110000" : "B",
+    "100100" : "C",
+    "100110" : "D",
+    "100010" : "E",
+    "110100" : "F",
+    "110110" : "G",
+    "110010" : "H",
+    "010100" : "I",
+    "010110" : "J",
+    "101000" : "K",
+    "111000" : "L",
+    "101100" : "M",
+    "101110" : "N",
+    "101010" : "O",
+    "111100" : "P",
+    "111110" : "Q",
+    "111010" : "R",
+    "011100" : "S",
+    "011110" : "T",
+    "101001" : "U",
+    "111001" : "V",
+    "010111" : "W",
+    "101101" : "X",
+    "101111" : "Y",
+    "101011" : "Z"
+}
+
 def order_points(pts):
     rect = np.zeros((4, 2), dtype="float32")
     s = pts.sum(axis=1)
@@ -61,7 +139,6 @@ def _transform_keypoints(keypoints, matrix):
         for kp, p in zip(keypoints, transformed)
     ]
 
-# Detection pipeline helpers
 def _preprocess_for_blobs(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blurred = cv2.bilateralFilter(gray, d=9, sigmaColor=75, sigmaSpace=75)
@@ -169,7 +246,6 @@ def _estimate_unit_spacing(keypoints):
         min_dists.append(d)
     return sorted(min_dists)[len(min_dists)//2]
 
-# Braille grid extraction
 def _cluster_1d(values, tol):
     if not values:
         return []
@@ -273,58 +349,11 @@ def keypoints_to_braille_binary(keypoints, unit):
 
     return result
 
-def open_test_photo_dropdown():
-    photos = sorted(
-        [p for p in TEST_PHOTOS_DIR.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS],
-        key=lambda p: p.name.lower(),
-    )
-
-    if not photos:
-        print(f"No images found in: {TEST_PHOTOS_DIR}")
-        return
-
-    root = tk.Tk()
-    root.title("Select Test Photo")
-    root.resizable(False, False)
-
-    ttk.Label(root, text="Choose a photo:").pack(padx=12, pady=(12, 6))
-
-    selected_name = tk.StringVar(value=photos[0].name)
-    combo = ttk.Combobox(
-        root,
-        textvariable=selected_name,
-        values=[p.name for p in photos],
-        state="readonly",
-        width=45,
-    )
-    combo.pack(padx=12, pady=6)
-    combo.current(0)
-
-    def run_detection():
-        selected_path = TEST_PHOTOS_DIR / selected_name.get()
-        if not selected_path.exists():
-            messagebox.showerror("Error", f"File not found:\n{selected_path}")
-            return
-        root.destroy()
-        binary = detect_3d_braille(str(selected_path))
-        print("Braille binary:", binary)
-
-    ttk.Button(root, text="Detect Braille", command=run_detection).pack(padx=12, pady=(6, 12))
-    root.mainloop()
-
-def detect_3d_braille(image_path, headless=False):
-    img = cv2.imread(image_path)
-    if img is None:
-        print("Error: Image not found.")
-        return []
-
+def detect_3d_braille_from_image(img):
     inverted = _preprocess_for_blobs(img)
     detector = _make_blob_detector()
     raw_keypoints = detector.detect(inverted)
 
-    valid_keypoints = []
-    flat_img = None
-    flat_keypoints = []
     binary_cells = []
 
     if raw_keypoints:
@@ -382,7 +411,6 @@ def detect_3d_braille(image_path, headless=False):
                     best_cluster = cluster
 
         if best_cluster is not None:
-            valid_keypoints = best_cluster
             cluster_pts = np.array([kp.pt for kp in best_cluster], dtype=np.float32)
             rect = cv2.minAreaRect(cluster_pts)
             (cx, cy), (w, h), angle = rect
@@ -405,234 +433,92 @@ def detect_3d_braille(image_path, headless=False):
                 flat_unit = _estimate_unit_spacing(flat_keypoints)
                 binary_cells = keypoints_to_braille_binary(flat_keypoints, flat_unit)
 
-            cv2.drawContours(img, [plate_corners], -1, (255, 0, 0), 2)
+    return binary_cells
 
-    img_with_keypoints = cv2.drawKeypoints(
-        img, valid_keypoints, np.array([]), (0, 0, 255),
-        cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-    )
+def binary_to_text(cells):
+    if not cells:
+        return ""
+    out = []
+    paren_open = False
+    number_mode = False
+    i = 0
+    while i < len(cells):
+        cell = cells[i]
+        i += 1
+        if len(cell) != 6:
+            continue
+        if cell == NUMBER_PREFIX:
+            number_mode = True
+            continue
+        if cell == LETTER_PREFIX:
+            number_mode = False
+            continue
+        if cell == CAPITAL_PREFIX:
+            if i < len(cells) and cells[i] in capitals:
+                out.append(capitals[cells[i]])
+                i += 1
+            continue
+        if cell not in letters:
+            continue
+        ch = letters[cell]
+        if number_mode and ch in numbers:
+            out.append(numbers[ch])
+        elif ch == "parenthesis":
+            out.append("(" if not paren_open else ")")
+            paren_open = not paren_open
+        elif ch == " ":
+            out.append(" ")
+            number_mode = False
+        elif ch == "letterPrefix":
+            number_mode = False
+        else:
+            out.append(ch)
+    return "".join(out).strip()
 
-    flat_with_keypoints = None
-    if flat_img is not None:
-        flat_with_keypoints = cv2.drawKeypoints(
-            flat_img, flat_keypoints, np.array([]), (0, 0, 255),
-            cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-        )
 
+def autocorrect_text(text):
+    if not text:
+        return text
     try:
-        root = tk.Tk()
-        root.withdraw()
-        screen_w = root.winfo_screenwidth()
-        screen_h = root.winfo_screenheight()
-        root.destroy()
-    except Exception:
-        screen_w, screen_h = 1920, 1080
-
-    def show_scaled(title, img_to_show):
-        if img_to_show is None:
-            return
-        h, w = img_to_show.shape[:2]
-        max_w = int(screen_w * 0.9)
-        max_h = int(screen_h * 0.8)
-        scale = min(max_w / w, max_h / h, 1.0)
-        disp_w, disp_h = int(w * scale), int(h * scale)
-        if scale < 1.0:
-            disp = cv2.resize(img_to_show, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
+        from textblob import TextBlob
+    except ImportError:
+        return text
+    parts = []
+    for token in text.split(" "):
+        if token.isalpha() and len(token) > 1:
+            parts.append(str(TextBlob(token).correct()))
         else:
-            disp = img_to_show
-        cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(title, disp_w, disp_h)
-        cv2.imshow(title, disp)
-
-    show_scaled("Preprocessed", inverted)
-    show_scaled("Detected 3D Braille", img_with_keypoints)
-    if flat_with_keypoints is not None:
-        show_scaled("Deskewed Plate (Re-detected)", flat_with_keypoints)
-
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    return binary_cells
+            parts.append(token)
+    return " ".join(parts)
 
 
-def detect_3d_braille_from_image(img, headless=False):
-    # Same pipeline as detect_3d_braille but accepts an already-loaded image
-    inverted = _preprocess_for_blobs(img)
-    detector = _make_blob_detector()
-    raw_keypoints = detector.detect(inverted)
+def decode_image_from_stdin():
+    raw = sys.stdin.buffer.read()
+    if not raw:
+        return None
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
-    valid_keypoints = []
-    flat_img = None
-    flat_keypoints = []
-    binary_cells = []
 
-    if raw_keypoints:
-        pts = [kp.pt for kp in raw_keypoints]
+def run_pipeline(img):
+    cells = detect_3d_braille_from_image(img)
+    print(f"Binary cells: {cells}", file=sys.stderr)
+    if not cells:
+        return "No braille detected"
+    
+    raw = binary_to_text(cells)
+    print(f"Raw text: {raw}", file=sys.stderr)
+    if not raw:
+        return "No braille detected"
+    
+    corrected = autocorrect_text(raw)
+    print(f"Autocorrected text: {corrected}", file=sys.stderr)
+    return corrected
 
-        min_dists = []
-        for i, p1 in enumerate(pts):
-            dists = [math.hypot(p1[0]-p2[0], p1[1]-p2[1]) for j, p2 in enumerate(pts) if i != j]
-            if dists:
-                min_dists.append(min(dists))
-
-        median_spacing = sorted(min_dists)[len(min_dists)//2] if min_dists else 10
-        search_radius = max(median_spacing * 4.0, 25.0)
-
-        clusters = []
-        visited = set()
-
-        for i, p in enumerate(pts):
-            if i in visited:
-                continue
-            current_cluster = [raw_keypoints[i]]
-            visited.add(i)
-            queue = [p]
-            while queue:
-                curr_p = queue.pop(0)
-                for j, other_p in enumerate(pts):
-                    if j not in visited:
-                        dist = math.hypot(curr_p[0]-other_p[0], curr_p[1]-other_p[1])
-                        if dist <= search_radius:
-                            visited.add(j)
-                            current_cluster.append(raw_keypoints[j])
-                            queue.append(other_p)
-            clusters.append(current_cluster)
-
-        best_cluster = None
-        best_score = 0
-
-        for cluster in clusters:
-            num_dots = len(cluster)
-            if 4 <= num_dots <= 80:
-                xs = [kp.pt[0] for kp in cluster]
-                ys = [kp.pt[1] for kp in cluster]
-                w = max(xs) - min(xs)
-                h = max(ys) - min(ys)
-                area = (w + 1) * (h + 1)
-                density = num_dots / area
-                consistency = _size_consistency(cluster)
-                regularity = _spacing_regularity(cluster)
-                aspect = max(w, h) / max(min(w, h), 1.0)
-                if aspect > 12.0:
-                    continue
-                score = (density * math.sqrt(num_dots) * (consistency ** 2) * (regularity ** 2))
-                if score > best_score:
-                    best_score = score
-                    best_cluster = cluster
-
-        if best_cluster is not None:
-            valid_keypoints = best_cluster
-            cluster_pts = np.array([kp.pt for kp in best_cluster], dtype=np.float32)
-            rect = cv2.minAreaRect(cluster_pts)
-            (cx, cy), (w, h), angle = rect
-            pad = median_spacing * 1.5
-            padded_rect = ((cx, cy), (w + pad, h + pad), angle)
-            corners = cv2.boxPoints(padded_rect)
-            plate_corners = np.int32(corners)
-            flat_img, warp_matrix = deskew_image(img.copy(), plate_corners)
-            flat_inverted = _preprocess_for_blobs(flat_img)
-            redetected = detector.detect(flat_inverted)
-            redetected = _filter_by_size_consistency(redetected, tolerance=0.4)
-            redetected = _largest_spatial_cluster(redetected, search_radius_factor=5.0)
-
-            if len(redetected) < max(4, int(len(best_cluster) * 0.6)):
-                flat_keypoints = _transform_keypoints(best_cluster, warp_matrix)
-            else:
-                flat_keypoints = redetected
-
-            if flat_keypoints:
-                flat_unit = _estimate_unit_spacing(flat_keypoints)
-                binary_cells = keypoints_to_braille_binary(flat_keypoints, flat_unit)
-
-            cv2.drawContours(img, [plate_corners], -1, (255, 0, 0), 2)
-
-    img_with_keypoints = cv2.drawKeypoints(
-        img, valid_keypoints, np.array([]), (0, 0, 255),
-        cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-    )
-
-    flat_with_keypoints = None
-    if flat_img is not None:
-        flat_with_keypoints = cv2.drawKeypoints(
-            flat_img, flat_keypoints, np.array([]), (0, 0, 255),
-            cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-        )
-
-    if HAVE_TK and not headless:
-        try:
-            root = tk.Tk()
-            root.withdraw()
-            screen_w = root.winfo_screenwidth()
-            screen_h = root.winfo_screenheight()
-            root.destroy()
-        except Exception:
-            screen_w, screen_h = 1920, 1080
-    else:
-        screen_w, screen_h = 1920, 1080
-
-    def show_scaled(title, img_to_show):
-        if img_to_show is None:
-            return
-        if headless:
-            return
-        h, w = img_to_show.shape[:2]
-        max_w = int(screen_w * 0.9)
-        max_h = int(screen_h * 0.8)
-        scale = min(max_w / w, max_h / h, 1.0)
-        disp_w, disp_h = int(w * scale), int(h * scale)
-        if scale < 1.0:
-            disp = cv2.resize(img_to_show, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
-        else:
-            disp = img_to_show
-        cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(title, disp_w, disp_h)
-        cv2.imshow(title, disp)
-
-    if not headless:
-        show_scaled("Preprocessed", inverted)
-        show_scaled("Detected 3D Braille", img_with_keypoints)
-        if flat_with_keypoints is not None:
-            show_scaled("Deskewed Plate (Re-detected)", flat_with_keypoints)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
-    return binary_cells
 
 if __name__ == "__main__":
-    import sys
-    # Simple arg parsing for --from-stdin and --headless
-    args = sys.argv[1:]
-    headless = False
-    if '--headless' in args:
-        headless = True
-        args.remove('--headless')
-
-    if args:
-        if args[0] == '--from-stdin':
-            # Force headless when reading from stdin
-            headless = True
-            data = sys.stdin.buffer.read()
-            if not data:
-                print('Error: no data on stdin', file=sys.stderr)
-                sys.exit(1)
-            arr = np.frombuffer(data, dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if img is None:
-                print('Error: failed to decode image from stdin', file=sys.stderr)
-                sys.exit(2)
-            result = detect_3d_braille_from_image(img, headless=headless)
-        else:
-            result = detect_3d_braille(args[0], headless=headless)
-
-        # Print structured JSON to stdout so the server logs capture it cleanly
-        out = { 'binary': result }
-        sys.stdout.write(json.dumps(out))
-        sys.stdout.flush()
-
-        # Exit code 3 when no binary detected to allow caller to distinguish
-        if not result:
-            sys.exit(3)
-        else:
-            sys.exit(0)
-    else:
-        open_test_photo_dropdown()
+    image = decode_image_from_stdin()
+    if image is None:
+        print("Could not decode image")
+        sys.exit(0)
+    print(run_pipeline(image))

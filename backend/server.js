@@ -49,113 +49,56 @@ wss.on('connection', (ws) => {
     message: 'WebSocket connection established'
   }));
 
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message.toString());
-      console.log('Received:', data.type);
-      if (data.type === 'image') {
-        const imgPayload = data.image || '';
-        let base64Data = imgPayload;
-        let ext = 'png';
+ws.on('message', (message) => {
+  try {
+    const data = JSON.parse(message.toString());
+    console.log('Received type:', data.type);
 
-        const dataUrlMatch = imgPayload.match(/^data:(image\/[^;]+);base64,(.+)$/);
-        if (dataUrlMatch) {
-          const mime = dataUrlMatch[1];
-          base64Data = dataUrlMatch[2];
-          const m = mime.split('/')[1];
-          ext = m === 'jpeg' ? 'jpg' : m;
-        }
+    if (data.type === 'image') {
+      const base64Data = (data.image || '').replace(/^data:image\/[^;]+;base64,/, '');
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      
+      console.log(`Received ${imgBuffer.length} bytes (in-memory)`);
 
-        const filename = data.filename || `img_${Date.now()}.${ext}`;
-        const imgBuffer = Buffer.from(base64Data, 'base64');
-        console.log(`Received ${imgBuffer.length} bytes for ${filename} (in-memory)`);
-
-        console.log(`Starting blobdetect.py (stdin) for ${filename}`);
-        if (!PY_EXEC) {
-          console.log('Cannot start blobdetect: no Python executable available');
-          ws.send(JSON.stringify({ type: 'error', message: 'Server: Python not available to run blobdetect' }));
-          return;
-        }
-
-        const py = spawn(PY_EXEC, ['blobdetect.py', '--from-stdin', '--headless'], { cwd: __dirname, stdio: ['pipe', 'pipe', 'pipe'] });
-
-        py.on('error', (err) => {
-          console.error(`Failed to spawn Python process (${PY_EXEC}): ${err.message}`);
-          ws.send(JSON.stringify({ type: 'error', message: `Server failed to start Python: ${err.message}` }));
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        py.stdout.on('data', (data) => {
-          stdout += data.toString();
-        });
-
-        py.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
-
-        py.on('close', (code) => {
-          if (stderr) {
-            console.error(`blobdetect stderr for ${filename}: ${stderr.trim()}`);
-          }
-
-          console.log(`blobdetect.py exited with code ${code} for ${filename}`);
-
-          let parsed = null;
-          const trimmed = stdout.trim();
-          if (trimmed) {
-            try {
-              parsed = JSON.parse(trimmed);
-              if (parsed && Array.isArray(parsed.binary)) {
-                console.log(`Detected binary for ${filename}: ${JSON.stringify(parsed.binary)}`);
-              } else {
-                console.log(`blobdetect output for ${filename} did not contain 'binary' array`);
-              }
-            } catch (e) {
-              console.error(`Failed to parse blobdetect JSON for ${filename}: ${e.message}`);
-            }
-          } else {
-            console.log(`blobdetect produced no stdout for ${filename}`);
-          }
-
-          if (code === 3) {
-            console.log(`No braille binary detected in ${filename}`);
-            ws.send(JSON.stringify({ type: 'result', binary: [], file: filename, detected: false }));
-            return;
-          }
-
-          if (parsed && Array.isArray(parsed.binary)) {
-            ws.send(JSON.stringify({ type: 'result', binary: parsed.binary, file: filename, detected: parsed.binary.length > 0 }));
-          } else if (trimmed) {
-            ws.send(JSON.stringify({ type: 'result', text: trimmed, file: filename }));
-          } else {
-            ws.send(JSON.stringify({ type: 'result', text: (stderr.trim() || `blobdetect exited with code ${code}`), file: filename }));
-          }
-        });
-
-        py.stdin.write(imgBuffer);
-        py.stdin.end();
-      } else if (data.type === 'ping') {
-        ws.send(JSON.stringify({
-          type: 'pong',
-          message: 'Server is alive'
-        }));
-      } else {
-        ws.send(JSON.stringify({
-          type: 'error',
-          message: 'Unknown message type'
-        }));
+      if (!PY_EXEC) {
+        console.error('Python executable not found.');
+        return ws.send(JSON.stringify({ type: 'error', message: 'Python unavailable' }));
       }
-    } catch (err) {
-      console.error('Error parsing message:', err);
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: 'Invalid JSON'
-      }));
-    }
-  });
 
+      console.log('Starting blobdetect.py via stdin...');
+      const py = spawn(PY_EXEC, ['blobdetect.py', '--from-stdin'], { cwd: __dirname });
+
+      let stdout = '';
+      let stderr = '';
+
+      py.stdout.on('data', (d) => stdout += d.toString());
+      py.stderr.on('data', (d) => {
+        const text = d.toString();
+        stderr += text;
+        console.log('Python stderr:', text.trim());
+      });
+
+      py.on('close', (code) => {
+        const text = stdout.trim() || stderr.trim() || `Exited with code ${code}`;
+        ws.send(JSON.stringify({ type: 'output', text }));
+      });
+
+      py.on('error', (err) => {
+        console.error('Python spawn error:', err);
+        ws.send(JSON.stringify({ type: 'error', message: `Python error: ${err.message}` }));
+      });
+
+      py.stdin.write(imgBuffer);
+      py.stdin.end();
+
+    } else {
+      ws.send(JSON.stringify({ type: 'error', message: 'Unknown message type' }));
+    }
+  } catch (err) {
+    console.error('WebSocket message error:', err);
+    ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON or parsing error' }));
+  }
+});
   ws.on('close', () => {
     console.log('Client disconnected');
   });

@@ -240,6 +240,11 @@
     color: #4a90e2;
     width: 100%;
   }
+
+  #text-overlay{
+    display : none;
+    text-align: center;
+  }
   
   @media (max-width: 750px) {
     body {
