@@ -1,9 +1,14 @@
 import cv2
 import numpy as np
 import math
+import sys
 
 CELL_STRIDE_X_U = 2.66
 LINE_STRIDE_Y_U = 4.27
+
+NUMBER_PREFIX = "001111"
+CAPITAL_PREFIX = "000001"
+LETTER_PREFIX = "000011"
 
 #translate vars
 wordss = []
@@ -63,7 +68,7 @@ numbers = {
     "j" : "0"
 }
 
-captials = {
+capitals = {
     "100000" : "A",
     "110000" : "B",
     "100100" : "C",
@@ -349,9 +354,6 @@ def detect_3d_braille_from_image(img):
     detector = _make_blob_detector()
     raw_keypoints = detector.detect(inverted)
 
-    valid_keypoints = []
-    flat_img = None
-    flat_keypoints = []
     binary_cells = []
 
     if raw_keypoints:
@@ -409,7 +411,6 @@ def detect_3d_braille_from_image(img):
                     best_cluster = cluster
 
         if best_cluster is not None:
-            valid_keypoints = best_cluster
             cluster_pts = np.array([kp.pt for kp in best_cluster], dtype=np.float32)
             rect = cv2.minAreaRect(cluster_pts)
             (cx, cy), (w, h), angle = rect
@@ -432,19 +433,92 @@ def detect_3d_braille_from_image(img):
                 flat_unit = _estimate_unit_spacing(flat_keypoints)
                 binary_cells = keypoints_to_braille_binary(flat_keypoints, flat_unit)
 
-            cv2.drawContours(img, [plate_corners], -1, (255, 0, 0), 2)
-
-    img_with_keypoints = cv2.drawKeypoints(
-        img, valid_keypoints, np.array([]), (0, 0, 255),
-        cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-    )
-
-    flat_with_keypoints = None
-    if flat_img is not None:
-        flat_with_keypoints = cv2.drawKeypoints(
-            flat_img, flat_keypoints, np.array([]), (0, 0, 255),
-            cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS
-        )
-        
     return binary_cells
 
+def binary_to_text(cells):
+    if not cells:
+        return ""
+    out = []
+    paren_open = False
+    number_mode = False
+    i = 0
+    while i < len(cells):
+        cell = cells[i]
+        i += 1
+        if len(cell) != 6:
+            continue
+        if cell == NUMBER_PREFIX:
+            number_mode = True
+            continue
+        if cell == LETTER_PREFIX:
+            number_mode = False
+            continue
+        if cell == CAPITAL_PREFIX:
+            if i < len(cells) and cells[i] in capitals:
+                out.append(capitals[cells[i]])
+                i += 1
+            continue
+        if cell not in letters:
+            continue
+        ch = letters[cell]
+        if number_mode and ch in numbers:
+            out.append(numbers[ch])
+        elif ch == "parenthesis":
+            out.append("(" if not paren_open else ")")
+            paren_open = not paren_open
+        elif ch == " ":
+            out.append(" ")
+            number_mode = False
+        elif ch == "letterPrefix":
+            number_mode = False
+        else:
+            out.append(ch)
+    return "".join(out).strip()
+
+
+def autocorrect_text(text):
+    if not text:
+        return text
+    try:
+        from textblob import TextBlob
+    except ImportError:
+        return text
+    parts = []
+    for token in text.split(" "):
+        if token.isalpha() and len(token) > 1:
+            parts.append(str(TextBlob(token).correct()))
+        else:
+            parts.append(token)
+    return " ".join(parts)
+
+
+def decode_image_from_stdin():
+    raw = sys.stdin.buffer.read()
+    if not raw:
+        return None
+    arr = np.frombuffer(raw, dtype=np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+
+def run_pipeline(img):
+    cells = detect_3d_braille_from_image(img)
+    print(f"Binary cells: {cells}", file=sys.stderr)
+    if not cells:
+        return "No braille detected"
+    
+    raw = binary_to_text(cells)
+    print(f"Raw text: {raw}", file=sys.stderr)
+    if not raw:
+        return "No braille detected"
+    
+    corrected = autocorrect_text(raw)
+    print(f"Autocorrected text: {corrected}", file=sys.stderr)
+    return corrected
+
+
+if __name__ == "__main__":
+    image = decode_image_from_stdin()
+    if image is None:
+        print("Could not decode image")
+        sys.exit(0)
+    print(run_pipeline(image))

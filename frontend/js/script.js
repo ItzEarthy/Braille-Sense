@@ -51,7 +51,7 @@ function connectWebSocket(retries = 5) {
       }
       if (data.type === "output") {
         textOverlay.style.zIndex = 20;
-        textOverlay.style.display = block;
+        textOverlay.style.display = 'block';
         textOverlay.textContent = data.text;
         speak(data.text);
       }
