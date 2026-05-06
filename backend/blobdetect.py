@@ -725,9 +725,9 @@ if __name__ == "__main__":
     else:
         open_test_photo_dropdown()
 
-def translate(binary):
+def translate(img, headless=headless):
     word = ""
-    blob = binary
+    blob = detect_3d_braille_from_image(img, headless=headless)
     p = False
     if blob.length <= 0 : 
         print("error blob has no elements")
