@@ -340,8 +340,8 @@ def keypoints_to_braille_binary(keypoints, unit):
                 col_to_dotcol[c] = max(0, min(1, dc))
 
             bits = []
-            for dr in range(3):
-                for dc in range(2):
+            for dc in range(2):
+                for dr in range(3):
                     hit = any(col_to_dotcol[c] == dc and dr in col_dotrows[c] for c in cell)
                     bits.append('1' if hit else '0')
             result.append(''.join(bits))
